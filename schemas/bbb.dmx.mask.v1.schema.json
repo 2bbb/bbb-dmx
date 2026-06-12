@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.mask.v1.schema.json",
+  "title": "bbb.dmx mask rules v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "rules"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.mask.v1"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "universe": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 512
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "action": {
+            "enum": [
+              "mute",
+              "hold",
+              "allow",
+              "force"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}

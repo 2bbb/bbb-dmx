@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.fixture.profile.v1.schema.json",
+  "title": "bbb.dmx fixture profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "key",
+    "modes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.fixture.profile.v1"
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manufacturer": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "photometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "beam_angle_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "field_angle_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "beam_radius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "luminous_flux": {
+          "type": "number",
+          "minimum": 0
+        },
+        "color_temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "modes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "footprint",
+          "channels"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "footprint": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "offset",
+                "key"
+              ],
+              "properties": {
+                "offset": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 512
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "label": {
+                  "type": "string"
+                },
+                "hold": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "minItems": 1
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "u8",
+                    "u16",
+                    "u24",
+                    "enum"
+                  ]
+                },
+                "channel": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "channels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1
+                },
+                "byte_order": {
+                  "enum": [
+                    "coarsefine",
+                    "finecoarse",
+                    "coarsemidfine",
+                    "finemidcoarse"
+                  ]
+                },
+                "range_degrees": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "ranges": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "from",
+                      "to",
+                      "function"
+                    ],
+                    "properties": {
+                      "from": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 16777215
+                      },
+                      "to": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 16777215
+                      },
+                      "function": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "physical_from": {
+                        "type": "number"
+                      },
+                      "physical_to": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "default": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 16777215
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "enum": [
+                          "u8",
+                          "enum"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "then": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "channel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "default": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        },
+                        "required": [
+                          "channel"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "channels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "minItems": 1,
+                            "maxItems": 1
+                          },
+                          "default": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        },
+                        "required": [
+                          "channels"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "u16"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "channels"
+                    ],
+                    "properties": {
+                      "channels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      },
+                      "default": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "u24"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "channels"
+                    ],
+                    "properties": {
+                      "channels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

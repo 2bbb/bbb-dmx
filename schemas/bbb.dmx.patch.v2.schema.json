@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.patch.v2.schema.json",
+  "title": "bbb.dmx fixture patch v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "coordinates",
+    "fixtures"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.patch.v2"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "profile",
+          "mode",
+          "universe",
+          "address"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "universe": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "address": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "position": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "rotation": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "calibration": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pan_offset": {
+                "type": "number"
+              },
+              "tilt_offset": {
+                "type": "number"
+              },
+              "pan_invert": {
+                "type": "boolean"
+              },
+              "tilt_invert": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "coordinates": {
+      "const": "gdtf",
+      "description": "Coordinate convention for fixture position/rotation. v2 is always GDTF/DIN SPEC 15800: Z-up world, hanging device rest, beam rest along device-local -Z."
+    }
+  }
+}

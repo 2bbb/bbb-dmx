@@ -1,0 +1,478 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.matrixmap.v1.schema.json",
+  "title": "bbb.dmx matrix map v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.matrixmap.v1"
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sample",
+          "params"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "point",
+                  "average",
+                  "max",
+                  "min"
+                ]
+              },
+              "x": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "w": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "h": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "params": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "r",
+                        "g",
+                        "b",
+                        "a",
+                        "luma",
+                        "maxrgb"
+                      ]
+                    },
+                    {
+                      "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                    }
+                  ]
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_pattern",
+        "cols",
+        "rows",
+        "params"
+      ],
+      "properties": {
+        "fixture_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mode": {
+          "enum": [
+            "point",
+            "average",
+            "max",
+            "min"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "anyOf": [
+                  {
+                    "enum": [
+                      "r",
+                      "g",
+                      "b",
+                      "a",
+                      "luma",
+                      "maxrgb"
+                    ]
+                  },
+                  {
+                    "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                  }
+                ]
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "grids": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_pattern",
+          "cols",
+          "rows",
+          "params"
+        ],
+        "properties": {
+          "fixture_pattern": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cols": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "start_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mode": {
+            "enum": [
+              "point",
+              "average",
+              "max",
+              "min"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "r",
+                        "g",
+                        "b",
+                        "a",
+                        "luma",
+                        "maxrgb"
+                      ]
+                    },
+                    {
+                      "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                    }
+                  ]
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "minItems": 1
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "fixtures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "sample",
+              "params"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sample": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "point",
+                      "average",
+                      "max",
+                      "min"
+                    ]
+                  },
+                  "x": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "w": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "h": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              "params": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "r",
+                            "g",
+                            "b",
+                            "a",
+                            "luma",
+                            "maxrgb"
+                          ]
+                        },
+                        {
+                          "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "fixtures"
+      ]
+    },
+    {
+      "properties": {
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fixture_pattern",
+            "cols",
+            "rows",
+            "params"
+          ],
+          "properties": {
+            "fixture_pattern": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cols": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "start_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mode": {
+              "enum": [
+                "point",
+                "average",
+                "max",
+                "min"
+              ]
+            },
+            "params": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "r",
+                          "g",
+                          "b",
+                          "a",
+                          "luma",
+                          "maxrgb"
+                        ]
+                      },
+                      {
+                        "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "grid"
+      ]
+    },
+    {
+      "properties": {
+        "grids": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixture_pattern",
+              "cols",
+              "rows",
+              "params"
+            ],
+            "properties": {
+              "fixture_pattern": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cols": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "start_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "mode": {
+                "enum": [
+                  "point",
+                  "average",
+                  "max",
+                  "min"
+                ]
+              },
+              "params": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "r",
+                            "g",
+                            "b",
+                            "a",
+                            "luma",
+                            "maxrgb"
+                          ]
+                        },
+                        {
+                          "pattern": "^constant:-?[0-9]+(\\.[0-9]+)?$"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "grids"
+      ]
+    }
+  ]
+}

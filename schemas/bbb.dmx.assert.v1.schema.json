@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.assert.v1.schema.json",
+  "title": "bbb.dmx assertion rules v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "rules"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.assert.v1"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "universe"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "universe": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "channel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "equals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "channel": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  }
+                },
+                "required": [
+                  "channel"
+                ]
+              },
+              {
+                "properties": {
+                  "start": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  }
+                },
+                "required": [
+                  "start"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "min": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "min"
+                ]
+              },
+              {
+                "properties": {
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "max"
+                ]
+              },
+              {
+                "properties": {
+                  "equals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                },
+                "required": [
+                  "equals"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "minItems": 1
+    }
+  }
+}

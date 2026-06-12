@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.scene.v1.schema.json",
+  "title": "bbb.dmx scene set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scenes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.scene.v1"
+    },
+    "scenes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}
