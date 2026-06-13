@@ -91,7 +91,9 @@ Validates fixture patch/profile JSON.
 
 Reports fixture metadata from loaded patch/profile JSON.
 
-- Input: `read`, `bang`, `listfixtures`, `fixture`, `listparams`, `param`, `dump`
+- Input: `read`, `bang`, `listfixtures`, `fixture`, `listparams`, `modeparams`, `param`, `dump`
+- `listparams fixture_id` / `param fixture_id parameter_key` inspect a patched fixture instance.
+- `listparams profile_key mode_key`, `modeparams profile_key mode_key`, and `param profile_key mode_key parameter_key` inspect a loaded profile/mode directly.
 - Output selectors: `summary`, `fixture`, `param`, `error`
 
 ### `bbb.dmx.matrixmap`
