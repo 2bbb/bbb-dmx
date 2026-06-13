@@ -387,7 +387,7 @@ int main() {
         "profiles": ["fixtures/generic.json.mover.json"],
         "fixtures": [
             {
-                "id": "json_spot_01",
+                "id": 12,
                 "profile": "generic.json.mover",
                 "mode": "basic16",
                 "universe": 1,
@@ -405,6 +405,7 @@ int main() {
     require(parsed_patch.coordinates == "gdtf", "fixture JSON patch coordinates");
     require(parsed_patch.profile_paths.size() == 1, "fixture JSON patch profile path count");
     require(parsed_patch.fixtures.size() == 1, "fixture JSON patch fixture count");
+    require(parsed_patch.fixtures[0].id == "12", "fixture JSON numeric patch id canonicalizes to string");
     require(parsed_patch.fixtures[0].address == 21, "fixture JSON patch address");
     require(parsed_patch.fixtures[0].calibration.pan_invert, "fixture JSON patch calibration bool");
 
@@ -413,7 +414,7 @@ int main() {
     require(map_result.ok, "fixture JSON mapper accepts parsed profile");
     map_result = json_mapper.set_patch(parsed_patch);
     require(map_result.ok, "fixture JSON mapper accepts parsed patch");
-    map_result = json_mapper.set_normalized("json_spot_01", "dimmer", 0.5);
+    map_result = json_mapper.set_normalized("12", "dimmer", 0.5);
     require(map_result.ok, "fixture JSON mapper normalized set");
     require(json_mapper.universe(1).channel(25) == 128, "fixture JSON mapper normalized dimmer");
 

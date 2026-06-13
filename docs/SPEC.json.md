@@ -284,7 +284,7 @@ Typical path: `patches/*.json`.
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
-| `id` | string | yes | — | Unique patch-local fixture id. |
+| `id` | string or integer | yes | — | Unique patch-local fixture id. Strings are preferred. Integer ids imported from MVR/MA-style data are accepted and canonicalized to decimal strings by consumers, so Max messages use e.g. `set 12 dimmer 255`. |
 | `profile` | string | yes | — | Must match a loaded profile `key`. |
 | `mode` | string | yes | — | Must match a mode key in the profile. |
 | `universe` | integer | yes | — | 1-based DMX universe id. |

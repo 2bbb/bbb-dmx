@@ -35,8 +35,16 @@
         ],
         "properties": {
           "id": {
-            "type": "string",
-            "minLength": 1
+            "description": "Unique patch-local fixture id. Strings are preferred; integer ids from MVR/MA imports are accepted and canonicalized to decimal strings by consumers.",
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "integer"
+              }
+            ]
           },
           "profile": {
             "type": "string",

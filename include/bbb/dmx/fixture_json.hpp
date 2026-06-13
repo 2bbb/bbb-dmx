@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -46,6 +48,37 @@ inline bool json_optional_double_present(const json_value &object, const std::st
     value = child->number_value;
     present = true;
     return true;
+}
+
+inline bool json_string_or_integer_id(const json_value &object, const std::string &key, std::string &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing string/integer id: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type == json_type::string) {
+        if(child->string_value.empty()) {
+            error = "empty string id: " + key;
+            return false;
+        }
+        value = child->string_value;
+        return true;
+    }
+    if(child->type == json_type::number) {
+        if(!std::isfinite(child->number_value) || std::floor(child->number_value) != child->number_value) {
+            error = "expected string or integer id: " + key;
+            return false;
+        }
+        std::ostringstream stream{};
+        stream << std::fixed << std::setprecision(0) << child->number_value;
+        value = stream.str();
+        return true;
+    }
+    error = "expected string or integer id: " + key;
+    return false;
 }
 
 inline bool parse_byte_order_string(const std::string &text, byte_order &order) {
@@ -267,7 +300,7 @@ inline mapper_result fixture_patch_from_json(const json_value &root, fixture_pat
             return mapper_result::failure("fixture must be object");
         }
         fixture_instance fixture{};
-        if(!json_string(fixture_value, "id", fixture.id, true, error)) {
+        if(!json_string_or_integer_id(fixture_value, "id", fixture.id, true, error)) {
             return mapper_result::failure(error);
         }
         if(!json_string(fixture_value, "profile", fixture.profile, true, error)) {
