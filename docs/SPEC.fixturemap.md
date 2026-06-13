@@ -13,7 +13,7 @@ The layer takes:
 
 It outputs:
 
-- fully resolved `512`-integer DMX universe buffers, each value clamped to `0..255`. The current `bbb.dmx.fixturemap` external outputs one selected universe per object instance.
+- fully resolved `512`-integer DMX universe buffers, each value clamped to `0..255`. `bbb.dmx.fixturemap` can output either the selected universe as a bare 512-value list or all known universes as `universe <id> <512 values...>` messages.
 
 This is intentionally separate from `bbb.dmx.movertrack`. `movertrack` computes values. The mapper decides where those values land in a universe.
 
@@ -73,7 +73,7 @@ A patch instance contains:
 - `address`: DMX start address, `1..512`
 - optional spatial/calibration data used by other `bbb.dmx.*` objects
 
-The mapper should allow multiple universes in the patch file, but a single object instance may select one universe to output.
+The mapper allows multiple universes in one patch file. A single object instance can select one universe for compatibility output, or output every known universe when `@universe_mode all` or `bangall` is used.
 
 ---
 
@@ -278,11 +278,12 @@ Attributes implemented today:
 |---|---|---:|---|
 | `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
 | `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
-| `@autobang` | bool | `1` | If non-zero, successful updates immediately output the full selected universe. |
+| `@autobang` | bool | `1` | If non-zero, successful updates immediately output according to `@universe_mode`. |
+| `@universe_mode` | symbol | `selected` | Output mode for `bang` and autobang: `selected` or `all`. |
 
 Outlets:
 
-1. left outlet: `512` integers, channel 1 first and channel 512 last
+1. left outlet: in `selected` mode, a bare `512` integer list; in `all`/`bangall`, one `universe <id> <512 values...>` message per known universe
 2. right outlet: status/error messages
 
 ### 7.2 Messages
@@ -296,14 +297,16 @@ dump
 clear
 reset
 bang
+bangall
 ```
 
 - `read` loads a patch JSON path.
 - `reload` reloads the current patch.
-- `dump` reports current load status from the right outlet.
+- `dump` reports current load status, selected universe, `universe_mode`, and known universe ids from the right outlet.
 - `clear` clears loaded profiles, patch data, and universe buffers.
 - `reset` restores loaded fixture channels to profile defaults.
-- `bang` outputs the current selected universe from the left outlet.
+- `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
+- `bangall` always outputs every known universe as `universe <id> <512 values...>` messages.
 
 #### Set fixture parameter
 
@@ -367,11 +370,13 @@ A typical patch is:
 
 Current behavior:
 
-- Every successful value update recomputes the internal universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output the full selected 512-byte universe.
-- `bang` always outputs the current full selected universe.
+- Every successful value update updates the internal multi-universe buffer.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
+- `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
+- `bang` follows `@universe_mode`; `bangall` forces all-universe output.
 - `reset` restores profile defaults for loaded fixtures.
-- `clear` leaves the object empty and outputs a zeroed selected universe when `@autobang 1`.
+- `clear` leaves the object empty and outputs a zeroed selected universe when `@autobang 1`; in all mode with no known universes it outputs the selected zeroed universe as a `universe` message.
 
 Not implemented today:
 

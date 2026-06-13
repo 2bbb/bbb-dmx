@@ -233,6 +233,15 @@ public:
         return found->second;
     }
 
+    std::vector<int> universe_ids() const {
+        std::vector<int> ids;
+        ids.reserve(universes_.size());
+        for(const auto &entry : universes_) {
+            ids.push_back(entry.first);
+        }
+        return ids;
+    }
+
     bool validated() const {
         return validated_;
     }
