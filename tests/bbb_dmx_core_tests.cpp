@@ -109,6 +109,19 @@ int main() {
     output = engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
     require(nearly_equal(output.pan_degrees, -90.0), "movertrack GDTF right pan degrees");
 
+    bbb::dmx::movertrack_engine relative_engine{};
+    relative_engine.set_tracking_mode(bbb::dmx::tracking_mode::off);
+    relative_engine.set_fixture_position(bbb::dmx::vec3{5.0, 10.0, 2.0});
+    const bbb::dmx::movertrack_output absolute_from_offset{relative_engine.compute(bbb::dmx::vec3{5.0, 20.0, 2.0})};
+    relative_engine.reset_tracking();
+    const bbb::dmx::movertrack_output relative_from_origin{relative_engine.compute_relative(bbb::dmx::vec3{0.0, 10.0, 0.0})};
+    require(nearly_equal(relative_from_origin.pan_degrees, absolute_from_offset.pan_degrees), "relative movertrack matches equivalent absolute pan");
+    require(nearly_equal(relative_from_origin.tilt_degrees, absolute_from_offset.tilt_degrees), "relative movertrack matches equivalent absolute tilt");
+    relative_engine.set_fixture_position(bbb::dmx::vec3{100.0, -50.0, 8.0});
+    output = relative_engine.bang();
+    require(nearly_equal(output.pan_degrees, relative_from_origin.pan_degrees), "bang preserves relative movertrack pan after fixture move");
+    require(nearly_equal(output.tilt_degrees, relative_from_origin.tilt_degrees), "bang preserves relative movertrack tilt after fixture move");
+
     bbb::dmx::movertrack_engine tracking_engine{};
     tracking_engine.set_tracking_mode(bbb::dmx::tracking_mode::pan);
     output = tracking_engine.compute(bbb::dmx::vec3{-0.0174524064, -0.999847695, 0.0});

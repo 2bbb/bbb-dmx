@@ -140,10 +140,13 @@ public:
     }
 
     movertrack_output bang() {
-        if(has_last_target_) {
-            return compute(last_target_);
+        if(!has_last_target_) {
+            return neutral_output();
         }
-        return neutral_output();
+        if(last_target_is_relative_) {
+            return compute_relative(last_relative_target_);
+        }
+        return compute(last_target_);
     }
 
     movertrack_output compute(const vec3 &target_position) {
@@ -152,40 +155,22 @@ public:
         }
 
         last_target_ = target_position;
+        last_target_is_relative_ = false;
         has_last_target_ = true;
 
-        const vec3 world_vector{target_position - settings_.fixture_position};
-        if(world_vector.nearly_zero()) {
+        return compute_world_vector(target_position - settings_.fixture_position);
+    }
+
+    movertrack_output compute_relative(const vec3 &relative_target_position) {
+        if(!relative_target_position.finite()) {
             return has_last_output_ ? last_output_with_current_order() : neutral_output();
         }
 
-        const vec3 local_vector{world_to_fixture_local(
-            world_vector,
-            settings_.rotation_degrees.x,
-            settings_.rotation_degrees.y,
-            settings_.rotation_degrees.z
-        )};
+        last_relative_target_ = relative_target_position;
+        last_target_is_relative_ = true;
+        has_last_target_ = true;
 
-        const pan_tilt_degrees raw_angles{vector_to_pan_tilt(local_vector)};
-        pan_tilt_degrees angles{choose_tracking_solution(raw_angles, local_vector)};
-
-        angles.pan = clamp_angle_to_range(angles.pan, settings_.pan_range_degrees);
-        angles.tilt = clamp_angle_to_range(angles.tilt, settings_.tilt_range_degrees);
-
-        previous_pan_degrees_ = angles.pan;
-        previous_tilt_degrees_ = angles.tilt;
-        has_previous_pan_ = true;
-
-        movertrack_output output{};
-        output.pan = angle_to_u16(angles.pan, settings_.pan_range_degrees);
-        output.tilt = angle_to_u16(angles.tilt, settings_.tilt_range_degrees);
-        output.bytes = pan_tilt_to_bytes(output.pan, output.tilt, settings_.order);
-        output.pan_degrees = angles.pan;
-        output.tilt_degrees = angles.tilt;
-
-        last_output_ = output;
-        has_last_output_ = true;
-        return output;
+        return compute_world_vector(relative_target_position);
     }
 
     bool calibrate_pan_offset(const vec3 &target_position, std::uint16_t desired_pan_value) {
@@ -314,6 +299,40 @@ private:
         return apply_calibration(raw_angles);
     }
 
+    movertrack_output compute_world_vector(const vec3 &world_vector) {
+        if(world_vector.nearly_zero()) {
+            return has_last_output_ ? last_output_with_current_order() : neutral_output();
+        }
+
+        const vec3 local_vector{world_to_fixture_local(
+            world_vector,
+            settings_.rotation_degrees.x,
+            settings_.rotation_degrees.y,
+            settings_.rotation_degrees.z
+        )};
+
+        const pan_tilt_degrees raw_angles{vector_to_pan_tilt(local_vector)};
+        pan_tilt_degrees angles{choose_tracking_solution(raw_angles, local_vector)};
+
+        angles.pan = clamp_angle_to_range(angles.pan, settings_.pan_range_degrees);
+        angles.tilt = clamp_angle_to_range(angles.tilt, settings_.tilt_range_degrees);
+
+        previous_pan_degrees_ = angles.pan;
+        previous_tilt_degrees_ = angles.tilt;
+        has_previous_pan_ = true;
+
+        movertrack_output output{};
+        output.pan = angle_to_u16(angles.pan, settings_.pan_range_degrees);
+        output.tilt = angle_to_u16(angles.tilt, settings_.tilt_range_degrees);
+        output.bytes = pan_tilt_to_bytes(output.pan, output.tilt, settings_.order);
+        output.pan_degrees = angles.pan;
+        output.tilt_degrees = angles.tilt;
+
+        last_output_ = output;
+        has_last_output_ = true;
+        return output;
+    }
+
     pan_tilt_degrees choose_tracking_solution(const pan_tilt_degrees &raw_angles, const vec3 &local_vector) const {
         pan_tilt_degrees calibrated_angles{apply_calibration(raw_angles)};
         if(settings_.tracking == tracking_mode::off) {
@@ -346,6 +365,8 @@ private:
 
     movertrack_settings settings_{};
     vec3 last_target_{};
+    vec3 last_relative_target_{};
+    bool last_target_is_relative_{false};
     bool has_last_target_{false};
     double previous_pan_degrees_{0.0};
     double previous_tilt_degrees_{0.0};
