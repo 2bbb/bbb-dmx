@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <string>
+#include <vector>
 
 #include "bbb/dmx/common.hpp"
 #include "bbb/dmx/curve.hpp"
@@ -21,6 +23,43 @@ void require(bool condition, const char *message) {
         std::cerr << "FAIL: " << message << std::endl;
         std::exit(1);
     }
+}
+
+
+const double *find_semantic_parameter(const bbb::dmx::semantic_color_mapping &mapping, const std::string &key) {
+    for(const auto &parameter : mapping.parameters) {
+        if(parameter.first == key) {
+            return &parameter.second;
+        }
+    }
+    return nullptr;
+}
+
+bbb::dmx::fixture_parameter make_u8_parameter(const std::string &key) {
+    bbb::dmx::fixture_parameter parameter{};
+    parameter.key = key;
+    parameter.type = bbb::dmx::fixture_parameter_type::u8;
+    parameter.channels = {key};
+    return parameter;
+}
+
+bbb::dmx::fixture_channel make_u8_channel(int offset, const std::string &key, int default_value = 0) {
+    bbb::dmx::fixture_channel channel{};
+    channel.offset = offset;
+    channel.key = key;
+    channel.default_value = default_value;
+    return channel;
+}
+
+bbb::dmx::fixture_mode make_semantic_color_mode(const std::vector<std::string> &keys) {
+    bbb::dmx::fixture_mode mode{};
+    mode.key = "color";
+    mode.footprint = (int)keys.size();
+    for(std::size_t index = 0; index < keys.size(); index++) {
+        mode.channels.push_back(make_u8_channel((int)index + 1, keys[index]));
+        mode.parameters.push_back(make_u8_parameter(keys[index]));
+    }
+    return mode;
 }
 
 } // namespace
@@ -417,6 +456,92 @@ int main() {
     map_result = json_mapper.set_normalized("12", "dimmer", 0.5);
     require(map_result.ok, "fixture JSON mapper normalized set");
     require(json_mapper.universe(1).channel(25) == 128, "fixture JSON mapper normalized dimmer");
+
+
+    bbb::dmx::fixture_mode rgb_mode{make_semantic_color_mode({"red", "green", "blue"})};
+    bbb::dmx::semantic_color_mapping color_mapping{bbb::dmx::semantic_color_parameters_for_mode(
+        rgb_mode,
+        bbb::dmx::make_semantic_color_request(1.2, 0.5, -0.1)
+    )};
+    require(color_mapping.ok, "semantic RGB mapping accepts RGB fixture");
+    require(color_mapping.parameters.size() == 3, "semantic RGB mapping writes three parameters");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 1.0), "semantic RGB mapping clamps red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.5), "semantic RGB mapping maps green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.0), "semantic RGB mapping clamps blue");
+
+    bbb::dmx::fixture_mode rgbw_mode{make_semantic_color_mode({"red", "green", "blue", "white"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        rgbw_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.75, 0.25),
+        bbb::dmx::semantic_color_options{true}
+    );
+    require(color_mapping.ok, "semantic RGBW mapping accepts RGBW fixture");
+    require(color_mapping.parameters.size() == 4, "semantic RGBW mapping writes white when enabled");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 0.75), "semantic RGBW mapping subtracts white from red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.5), "semantic RGBW mapping subtracts white from green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.0), "semantic RGBW mapping subtracts white from blue");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "white"), 0.25), "semantic RGBW mapping extracts white");
+
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        rgbw_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.75, 0.25),
+        bbb::dmx::semantic_color_options{false}
+    );
+    require(color_mapping.ok, "semantic RGBW mapping accepts disabled white mode");
+    require(color_mapping.parameters.size() == 3, "semantic RGBW mapping leaves white untouched when disabled");
+    require(find_semantic_parameter(color_mapping, "white") == nullptr, "semantic RGBW disabled mode does not emit white parameter");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 1.0), "semantic RGBW disabled mode keeps full red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.75), "semantic RGBW disabled mode keeps full green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.25), "semantic RGBW disabled mode keeps full blue");
+
+    bbb::dmx::fixture_mode cmy_mode{make_semantic_color_mode({"cyan", "magenta", "yellow"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        cmy_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.25, 0.0)
+    );
+    require(color_mapping.ok, "semantic CMY mapping accepts CMY fixture");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "cyan"), 0.0), "semantic CMY mapping inverts red to cyan");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "magenta"), 0.75), "semantic CMY mapping inverts green to magenta");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "yellow"), 1.0), "semantic CMY mapping inverts blue to yellow");
+
+    bbb::dmx::fixture_mode dimmer_only_mode{make_semantic_color_mode({"dimmer"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        dimmer_only_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0)
+    );
+    require(!color_mapping.ok, "semantic color mapping rejects unsupported fixture");
+
+    bbb::dmx::fixture_profile rgbw_profile{};
+    rgbw_profile.key = "test.rgbw";
+    rgbw_profile.modes = {rgbw_mode};
+    bbb::dmx::fixture_instance rgbw_fixture{};
+    rgbw_fixture.id = "rgbw_01";
+    rgbw_fixture.profile = "test.rgbw";
+    rgbw_fixture.mode = "color";
+    rgbw_fixture.universe = 1;
+    rgbw_fixture.address = 1;
+    bbb::dmx::fixture_patch rgbw_patch{};
+    rgbw_patch.fixtures = {rgbw_fixture};
+    bbb::dmx::fixture_mapper rgbw_mapper{};
+    map_result = rgbw_mapper.add_profile(rgbw_profile);
+    require(map_result.ok, "semantic RGBW mapper accepts profile");
+    map_result = rgbw_mapper.set_patch(rgbw_patch);
+    require(map_result.ok, "semantic RGBW mapper accepts patch");
+    map_result = rgbw_mapper.set_u8("rgbw_01", "white", 200);
+    require(map_result.ok, "semantic RGBW mapper seeds white");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        rgbw_mode,
+        bbb::dmx::make_semantic_color_request(0.25, 0.5, 0.75),
+        bbb::dmx::semantic_color_options{false}
+    );
+    for(const auto &parameter : color_mapping.parameters) {
+        map_result = rgbw_mapper.set_normalized("rgbw_01", parameter.first, parameter.second);
+        require(map_result.ok, "semantic RGBW mapper applies color parameter");
+    }
+    require(rgbw_mapper.universe(1).channel(1) == 64, "semantic RGBW mapper writes red with white disabled");
+    require(rgbw_mapper.universe(1).channel(2) == 128, "semantic RGBW mapper writes green with white disabled");
+    require(rgbw_mapper.universe(1).channel(3) == 191, "semantic RGBW mapper writes blue with white disabled");
+    require(rgbw_mapper.universe(1).channel(4) == 200, "semantic RGBW mapper leaves white untouched when disabled");
 
     std::cout << "bbb_dmx_common_tests passed" << std::endl;
     return 0;
