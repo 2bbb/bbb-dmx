@@ -60,6 +60,82 @@ inline bool mode_has_semantic_parameter(const fixture_mode &mode, const char *pa
     return mode.find_parameter(parameter) != nullptr;
 }
 
+inline int color_parameter_first_offset(const fixture_mode &mode, const fixture_parameter &parameter) {
+    if(parameter.channels.empty()) {
+        return 0;
+    }
+    const fixture_channel *channel{mode.find_channel(parameter.channels.front())};
+    if(!channel) {
+        return 0;
+    }
+    return channel->offset;
+}
+
+inline bool color_parameter_is_dimmer_like(const fixture_parameter &parameter) {
+    std::string normalized;
+    normalized.reserve(parameter.key.size());
+    for(const char character : parameter.key) {
+        const unsigned char unsigned_character{(unsigned char)character};
+        if(std::isalnum(unsigned_character)) {
+            normalized.push_back((char)std::tolower(unsigned_character));
+        }
+    }
+    return normalized == "dimmer" ||
+        normalized.find("dimmer") == 0 ||
+        normalized.find("intensity") != std::string::npos;
+}
+
+inline const fixture_parameter *associated_color_dimmer_parameter(
+    const fixture_mode &mode,
+    const std::vector<std::string> &color_parameter_keys
+) {
+    int first_color_offset{0};
+    for(const auto &key : color_parameter_keys) {
+        const fixture_parameter *parameter{mode.find_parameter(key)};
+        if(!parameter) {
+            continue;
+        }
+        const int offset{color_parameter_first_offset(mode, *parameter)};
+        if(offset <= 0) {
+            continue;
+        }
+        if(first_color_offset == 0 || offset < first_color_offset) {
+            first_color_offset = offset;
+        }
+    }
+    if(first_color_offset <= 0) {
+        return nullptr;
+    }
+
+    const fixture_parameter *best_parameter{nullptr};
+    int best_offset{-1};
+    for(const auto &parameter : mode.parameters) {
+        if(!color_parameter_is_dimmer_like(parameter)) {
+            continue;
+        }
+        const int offset{color_parameter_first_offset(mode, parameter)};
+        if(offset <= 0 || first_color_offset <= offset) {
+            continue;
+        }
+        if(best_offset < offset) {
+            best_parameter = &parameter;
+            best_offset = offset;
+        }
+    }
+    return best_parameter;
+}
+
+inline double color_request_intensity(const semantic_color_request &color) {
+    return std::max(color.red, std::max(color.green, color.blue));
+}
+
+inline double color_component_for_associated_dimmer(double component, double intensity) {
+    if(intensity <= 0.0) {
+        return 0.0;
+    }
+    return std::max(0.0, std::min(1.0, component / intensity));
+}
+
 inline std::string normalized_color_key(const std::string &text) {
     std::string result;
     result.reserve(text.size());
@@ -334,17 +410,22 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
         mode_has_semantic_parameter(mode, "green") &&
         mode_has_semantic_parameter(mode, "blue")
     ) {
+        const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, {"red", "green", "blue", "white"})};
+        const double intensity{associated_dimmer ? color_request_intensity(clamped_color) : 1.0};
         const bool has_white{mode_has_semantic_parameter(mode, "white")};
         if(has_white && options.use_white) {
             const double white{std::min(clamped_color.red, std::min(clamped_color.green, clamped_color.blue))};
-            parameters.push_back({"red", clamped_color.red - white});
-            parameters.push_back({"green", clamped_color.green - white});
-            parameters.push_back({"blue", clamped_color.blue - white});
-            parameters.push_back({"white", white});
+            parameters.push_back({"red", color_component_for_associated_dimmer(clamped_color.red - white, intensity)});
+            parameters.push_back({"green", color_component_for_associated_dimmer(clamped_color.green - white, intensity)});
+            parameters.push_back({"blue", color_component_for_associated_dimmer(clamped_color.blue - white, intensity)});
+            parameters.push_back({"white", color_component_for_associated_dimmer(white, intensity)});
         } else {
-            parameters.push_back({"red", clamped_color.red});
-            parameters.push_back({"green", clamped_color.green});
-            parameters.push_back({"blue", clamped_color.blue});
+            parameters.push_back({"red", color_component_for_associated_dimmer(clamped_color.red, intensity)});
+            parameters.push_back({"green", color_component_for_associated_dimmer(clamped_color.green, intensity)});
+            parameters.push_back({"blue", color_component_for_associated_dimmer(clamped_color.blue, intensity)});
+        }
+        if(associated_dimmer) {
+            parameters.push_back({associated_dimmer->key, intensity});
         }
         return semantic_color_mapping::success(parameters);
     }
@@ -354,9 +435,14 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
         mode_has_semantic_parameter(mode, "magenta") &&
         mode_has_semantic_parameter(mode, "yellow")
     ) {
-        parameters.push_back({"cyan", 1.0 - clamped_color.red});
-        parameters.push_back({"magenta", 1.0 - clamped_color.green});
-        parameters.push_back({"yellow", 1.0 - clamped_color.blue});
+        const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, {"cyan", "magenta", "yellow"})};
+        const double intensity{associated_dimmer ? color_request_intensity(clamped_color) : 1.0};
+        parameters.push_back({"cyan", 1.0 - color_component_for_associated_dimmer(clamped_color.red, intensity)});
+        parameters.push_back({"magenta", 1.0 - color_component_for_associated_dimmer(clamped_color.green, intensity)});
+        parameters.push_back({"yellow", 1.0 - color_component_for_associated_dimmer(clamped_color.blue, intensity)});
+        if(associated_dimmer) {
+            parameters.push_back({associated_dimmer->key, intensity});
+        }
         return semantic_color_mapping::success(parameters);
     }
 

@@ -539,6 +539,19 @@ int main() {
     require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.5), "semantic RGB mapping maps green");
     require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.0), "semantic RGB mapping clamps blue");
 
+    bbb::dmx::fixture_mode jdc_color_mode{make_semantic_color_mode({"dimmer", "shutter", "shutter_2", "shutter_3", "dimmer_2", "red", "green", "blue"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        jdc_color_mode,
+        bbb::dmx::make_semantic_color_request(0.25, 0.5, 0.75)
+    );
+    require(color_mapping.ok, "semantic RGB mapping accepts RGB fixture with associated dimmer");
+    require(color_mapping.parameters.size() == 4, "semantic RGB mapping writes RGB plus nearest associated dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 1.0 / 3.0), "semantic RGB mapping normalizes red through associated dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 2.0 / 3.0), "semantic RGB mapping normalizes green through associated dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 1.0), "semantic RGB mapping normalizes blue through associated dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer_2"), 0.75), "semantic RGB mapping opens nearest color dimmer instead of earlier strobe dimmer");
+    require(find_semantic_parameter(color_mapping, "dimmer") == nullptr, "semantic RGB mapping does not open earlier strobe dimmer");
+
     bbb::dmx::fixture_mode rgbw_mode{make_semantic_color_mode({"red", "green", "blue", "white"})};
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
         rgbw_mode,
