@@ -200,6 +200,59 @@ public:
         return set_u8(fixture_id, parameter_key, int_value);
     }
 
+    mapper_result current_raw_value(const std::string &fixture_id, const std::string &parameter_key, int &value) const {
+        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
+        if(!resolved.ok) {
+            return mapper_result::failure(resolved.message);
+        }
+        if(resolved.parameter->channels.empty()) {
+            return mapper_result::failure("parameter has no channel: " + parameter_key);
+        }
+        const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
+        if(!first_channel) {
+            return mapper_result::failure("parameter first channel missing: " + parameter_key);
+        }
+        const dmx_universe &target_universe{universe(resolved.fixture->universe)};
+        const int first_address{resolved.fixture->address + first_channel->offset - 1};
+        if(resolved.parameter->type == fixture_parameter_type::u16) {
+            if(resolved.parameter->channels.size() < 2) {
+                return mapper_result::failure("u16 parameter needs two channels: " + parameter_key);
+            }
+            const fixture_channel *second_channel{resolved.mode->find_channel(resolved.parameter->channels[1])};
+            if(!second_channel) {
+                return mapper_result::failure("parameter second channel missing: " + parameter_key);
+            }
+            const int second_address{resolved.fixture->address + second_channel->offset - 1};
+            value = (int)combine_16(
+                (std::uint8_t)target_universe.channel(first_address),
+                (std::uint8_t)target_universe.channel(second_address),
+                resolved.parameter->order
+            );
+            return mapper_result::success();
+        }
+        if(resolved.parameter->type == fixture_parameter_type::u24) {
+            if(resolved.parameter->channels.size() < 3) {
+                return mapper_result::failure("u24 parameter needs three channels: " + parameter_key);
+            }
+            const fixture_channel *second_channel{resolved.mode->find_channel(resolved.parameter->channels[1])};
+            const fixture_channel *third_channel{resolved.mode->find_channel(resolved.parameter->channels[2])};
+            if(!second_channel || !third_channel) {
+                return mapper_result::failure("parameter u24 channel missing: " + parameter_key);
+            }
+            const int second_address{resolved.fixture->address + second_channel->offset - 1};
+            const int third_address{resolved.fixture->address + third_channel->offset - 1};
+            value = (int)combine_24(
+                (std::uint8_t)target_universe.channel(first_address),
+                (std::uint8_t)target_universe.channel(second_address),
+                (std::uint8_t)target_universe.channel(third_address),
+                resolved.parameter->order
+            );
+            return mapper_result::success();
+        }
+        value = target_universe.channel(first_address);
+        return mapper_result::success();
+    }
+
     mapper_result set_pan_tilt_bytes(const std::string &fixture_id, int pan_1, int pan_2, int tilt_1, int tilt_2) {
         const resolved_parameter pan{resolve_parameter(fixture_id, "pan")};
         if(!pan.ok) {

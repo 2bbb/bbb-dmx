@@ -285,7 +285,7 @@ Attributes implemented today:
 | `@default_tilt_range` | float | `270.` | Fallback tilt range in degrees when a profile omits `tilt.range_degrees`. |
 | `@track_strict` | bool | `0` | If non-zero, `trackall` errors on fixtures without pan/tilt instead of skipping them. |
 | `@color_use_white` | bool | `1` | RGBW behavior for `color`/`colorall`: extract white from RGB when enabled, leave white untouched when disabled. |
-| `@color_wheel_fallback` | bool | `0` | Optional fallback for fixtures without RGB/RGBW/CMY: map semantic RGB to the nearest color wheel slot using profile `wheels`/`ranges` metadata. |
+| `@color_wheel_fallback` | bool | `0` | Optional fallback for fixtures without RGB/RGBW/CMY: map semantic RGB to color wheel hue plus `dimmer = max(r,g,b)` when available. |
 
 Outlets:
 
@@ -345,7 +345,7 @@ colorall rgb8 255 204 0
 
 `color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, and `blue`; `white` is left untouched so it can be managed separately. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
 
-Color wheel fallback is deliberately opt-in. With `@color_wheel_fallback 1`, only fixtures that have no RGB/RGBW/CMY semantic model fall back to the nearest color wheel range. Matching uses `parameter.wheel` / `range.wheel_slot` against top-level `wheels[].slots[].rgb` or `cie_xyY`; if those are absent it falls back to conservative color-name matching from range/slot labels. The written value is the midpoint of the matched range. With the default `@color_wheel_fallback 0`, semantic color never touches a color wheel.
+Color wheel fallback is deliberately opt-in. With `@color_wheel_fallback 1`, only fixtures that have no RGB/RGBW/CMY semantic model fall back to a color wheel plus dimmer model. The requested RGB is split into brightness `max(r,g,b)` and normalized hue `rgb / brightness`; black (`0 0 0`) uses open/white hue with brightness `0`. Matching uses `parameter.wheel` / `range.wheel_slot` against top-level `wheels[].slots[].rgb` or `cie_xyY`; if those are absent it falls back to conservative color-name matching from range/slot labels. The color wheel value is the midpoint of the matched range; if a `dimmer` parameter exists, it is set to the brightness. When multiple ranges are equally good matches, current wheel raw value is used as a tie-breaker so the nearest equivalent open/slot is chosen. With the default `@color_wheel_fallback 0`, semantic color never touches a color wheel.
 
 `colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY model or, when enabled, a supported color wheel fallback. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
 

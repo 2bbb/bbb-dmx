@@ -578,8 +578,11 @@ int main() {
     };
     bbb::dmx::fixture_mode wheel_mode{};
     wheel_mode.key = "wheel";
-    wheel_mode.footprint = 1;
-    wheel_mode.channels = {make_u8_channel(1, "color_wheel")};
+    wheel_mode.footprint = 2;
+    wheel_mode.channels = {
+        make_u8_channel(1, "color_wheel"),
+        make_u8_channel(2, "dimmer")
+    };
     bbb::dmx::fixture_parameter wheel_parameter{make_u8_parameter("color_wheel")};
     wheel_parameter.type = bbb::dmx::fixture_parameter_type::enum_u8;
     wheel_parameter.channels = {"color_wheel"};
@@ -587,7 +590,8 @@ int main() {
     wheel_parameter.ranges = {
         make_parameter_range(0, 9, "open", "Open"),
         make_parameter_range(10, 19, "red", "Red"),
-        make_parameter_range(20, 29, "blue", "Blue")
+        make_parameter_range(20, 29, "blue", "Blue"),
+        make_parameter_range(100, 109, "open", "Open")
     };
     wheel_parameter.ranges[0].has_wheel_slot = true;
     wheel_parameter.ranges[0].wheel_slot = 1;
@@ -595,7 +599,9 @@ int main() {
     wheel_parameter.ranges[1].wheel_slot = 2;
     wheel_parameter.ranges[2].has_wheel_slot = true;
     wheel_parameter.ranges[2].wheel_slot = 3;
-    wheel_mode.parameters = {wheel_parameter};
+    wheel_parameter.ranges[3].has_wheel_slot = true;
+    wheel_parameter.ranges[3].wheel_slot = 1;
+    wheel_mode.parameters = {wheel_parameter, make_u8_parameter("dimmer")};
     wheel_profile.wheels = {color_wheel};
     wheel_profile.modes = {wheel_mode};
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
@@ -612,9 +618,46 @@ int main() {
         bbb::dmx::semantic_color_options{true, true}
     );
     require(color_mapping.ok, "semantic color wheel fallback maps nearest slot");
-    require(color_mapping.parameters.size() == 1, "semantic color wheel fallback writes one parameter");
-    require(color_mapping.parameters[0].first == "color_wheel", "semantic color wheel fallback writes color wheel parameter");
-    require(nearly_equal(color_mapping.parameters[0].second, 14.0 / 255.0), "semantic color wheel fallback uses range center");
+    require(color_mapping.parameters.size() == 2, "semantic color wheel fallback writes color wheel and dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 14.0 / 255.0), "semantic color wheel fallback uses range center");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 1.0), "semantic color wheel fallback opens dimmer for full red");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(0.5, 0.0, 0.0),
+        bbb::dmx::semantic_color_options{true, true}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback maps dimmed red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 14.0 / 255.0), "semantic color wheel fallback uses normalized hue for dimmed red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 0.5), "semantic color wheel fallback maps brightness to dimmer");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0),
+        bbb::dmx::semantic_color_options{true, true}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback maps white to open");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 4.0 / 255.0), "semantic color wheel fallback keeps first equal open without current value");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 1.0), "semantic color wheel fallback opens dimmer for white");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0),
+        bbb::dmx::semantic_color_options{true, true},
+        {{"color_wheel", 105}}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback maps white with current value");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 104.0 / 255.0), "semantic color wheel fallback uses nearest equal open range");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(0.0, 0.0, 0.0),
+        bbb::dmx::semantic_color_options{true, true},
+        {{"color_wheel", 105}}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback maps black to open");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 104.0 / 255.0), "semantic color wheel fallback maps black to nearest open range");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 0.0), "semantic color wheel fallback maps black to dimmer closed");
 
     bbb::dmx::fixture_mode shutter_mode{make_semantic_shutter_mode("shutter", "shutter")};
     bbb::dmx::semantic_shutter_mapping shutter_mapping{bbb::dmx::semantic_shutter_parameter_for_mode(shutter_mode, true)};

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <string>
 #include <utility>
@@ -92,6 +93,19 @@ inline double color_distance_squared(const semantic_color_request &left, const s
     const double green_delta{left.green - right.green};
     const double blue_delta{left.blue - right.blue};
     return red_delta * red_delta + green_delta * green_delta + blue_delta * blue_delta;
+}
+
+inline int current_parameter_distance(
+    const std::vector<std::pair<std::string, int>> &current_parameter_values,
+    const std::string &parameter_key,
+    int range_center
+) {
+    for(const auto &current_parameter : current_parameter_values) {
+        if(current_parameter.first == parameter_key) {
+            return std::abs(current_parameter.second - range_center);
+        }
+    }
+    return std::numeric_limits<int>::max();
 }
 
 inline bool known_color_name_to_rgb(const std::string &name, semantic_color_request &color) {
@@ -241,12 +255,22 @@ inline bool color_from_range_metadata(
 inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
     const fixture_profile *profile,
     const fixture_mode &mode,
-    const semantic_color_request &color
+    const semantic_color_request &color,
+    const std::vector<std::pair<std::string, int>> &current_parameter_values = {}
 ) {
+    const double intensity{std::max(color.red, std::max(color.green, color.blue))};
+    const bool request_is_black{intensity <= 1.0e-12};
+    const semantic_color_request match_color{
+        request_is_black ?
+            make_semantic_color_request(1.0, 1.0, 1.0) :
+            make_semantic_color_request(color.red / intensity, color.green / intensity, color.blue / intensity)
+    };
     const fixture_parameter *best_parameter{nullptr};
     const fixture_parameter_range *best_range{nullptr};
     double best_distance{std::numeric_limits<double>::infinity()};
     int best_bias{0};
+    int best_current_distance{std::numeric_limits<int>::max()};
+    constexpr double distance_epsilon{1.0e-12};
 
     for(const auto &parameter : mode.parameters) {
         if(!parameter_is_likely_color_wheel(parameter)) {
@@ -264,12 +288,20 @@ inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
             if(!range.wheel.empty() || !parameter.wheel.empty()) {
                 bias += 10;
             }
-            const double distance{color_distance_squared(color, slot_color)};
-            if(distance < best_distance || (distance == best_distance && best_bias < bias)) {
+            const double distance{color_distance_squared(match_color, slot_color)};
+            const int range_center{color_range_center_value(range)};
+            const int current_distance{current_parameter_distance(current_parameter_values, parameter.key, range_center)};
+            const bool better_distance{distance < best_distance - distance_epsilon};
+            const bool same_distance{std::abs(distance - best_distance) <= distance_epsilon};
+            const bool better_bias{same_distance && best_bias < bias};
+            const bool same_bias{same_distance && best_bias == bias};
+            const bool better_current_distance{same_bias && current_distance < best_current_distance};
+            if(better_distance || better_bias || better_current_distance) {
                 best_parameter = &parameter;
                 best_range = &range;
                 best_distance = distance;
                 best_bias = bias;
+                best_current_distance = current_distance;
             }
         }
     }
@@ -278,16 +310,21 @@ inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
         return semantic_color_mapping::failure("fixture has no semantic color model");
     }
 
-    return semantic_color_mapping::success({
+    std::vector<std::pair<std::string, double>> parameters{
         {best_parameter->key, (double)color_range_center_value(*best_range) / (double)color_parameter_max_value(*best_parameter)}
-    });
+    };
+    if(mode_has_semantic_parameter(mode, "dimmer")) {
+        parameters.push_back({"dimmer", intensity});
+    }
+    return semantic_color_mapping::success(parameters);
 }
 
 inline semantic_color_mapping semantic_color_parameters_for_mode(
     const fixture_profile *profile,
     const fixture_mode &mode,
     const semantic_color_request &color,
-    const semantic_color_options &options = {}
+    const semantic_color_options &options = {},
+    const std::vector<std::pair<std::string, int>> &current_parameter_values = {}
 ) {
     std::vector<std::pair<std::string, double>> parameters;
     const semantic_color_request clamped_color{make_semantic_color_request(color.red, color.green, color.blue)};
@@ -324,7 +361,7 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
     }
 
     if(options.color_wheel_fallback) {
-        return semantic_color_wheel_fallback_parameters_for_mode(profile, mode, clamped_color);
+        return semantic_color_wheel_fallback_parameters_for_mode(profile, mode, clamped_color, current_parameter_values);
     }
 
     return semantic_color_mapping::failure("fixture has no semantic color model");
