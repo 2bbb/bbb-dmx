@@ -8,4 +8,5 @@
 #include "bbb/dmx/value.hpp"
 #include "bbb/dmx/fixture_mapper.hpp"
 #include "bbb/dmx/fixture_json.hpp"
+#include "bbb/dmx/fixture_groups.hpp"
 #include "bbb/dmx/frame_set.hpp"
