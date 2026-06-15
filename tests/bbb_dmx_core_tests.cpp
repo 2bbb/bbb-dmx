@@ -62,6 +62,31 @@ bbb::dmx::fixture_mode make_semantic_color_mode(const std::vector<std::string> &
     return mode;
 }
 
+bbb::dmx::fixture_parameter_range make_parameter_range(int from, int to, const std::string &function_name, const std::string &label) {
+    bbb::dmx::fixture_parameter_range range{};
+    range.from = from;
+    range.to = to;
+    range.function = function_name;
+    range.label = label;
+    return range;
+}
+
+bbb::dmx::fixture_mode make_semantic_shutter_mode(const std::string &parameter_key, const std::string &channel_key) {
+    bbb::dmx::fixture_mode mode{};
+    mode.key = "shutter";
+    mode.footprint = 1;
+    mode.channels = {make_u8_channel(1, channel_key)};
+    bbb::dmx::fixture_parameter parameter{make_u8_parameter(parameter_key)};
+    parameter.channels = {channel_key};
+    parameter.ranges = {
+        make_parameter_range(0, 31, "closed", "Closed"),
+        make_parameter_range(32, 63, "open", "Open"),
+        make_parameter_range(64, 127, "strobe", "Strobe")
+    };
+    mode.parameters = {parameter};
+    return mode;
+}
+
 } // namespace
 
 int main() {
@@ -510,6 +535,86 @@ int main() {
         bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0)
     );
     require(!color_mapping.ok, "semantic color mapping rejects unsupported fixture");
+
+    bbb::dmx::fixture_mode shutter_mode{make_semantic_shutter_mode("shutter", "shutter")};
+    bbb::dmx::semantic_shutter_mapping shutter_mapping{bbb::dmx::semantic_shutter_parameter_for_mode(shutter_mode, true)};
+    require(shutter_mapping.ok, "semantic shutter mapping accepts shutter ranges");
+    require(shutter_mapping.parameter == "shutter", "semantic shutter mapping selects shutter parameter");
+    require(shutter_mapping.value == 47, "semantic shutter open uses center of open range");
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(shutter_mode, false);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts closed ranges");
+    require(shutter_mapping.value == 15, "semantic shutter close uses center of closed range");
+
+    bbb::dmx::fixture_mode strobe_only_mode{make_semantic_shutter_mode("strobe", "shutter_strobe")};
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(strobe_only_mode, true);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts strobe-only shared channel ranges");
+    require(shutter_mapping.parameter == "strobe", "semantic shutter mapping can target strobe parameter on shared shutter channel");
+    require(shutter_mapping.value == 47, "semantic shutter strobe-only open uses open range");
+
+    bbb::dmx::fixture_mode fallback_shutter_mode{};
+    fallback_shutter_mode.key = "fallback-shutter";
+    fallback_shutter_mode.footprint = 2;
+    fallback_shutter_mode.channels = {
+        make_u8_channel(1, "shutter.coarse"),
+        make_u8_channel(2, "shutter.fine")
+    };
+    bbb::dmx::fixture_parameter fallback_shutter_parameter{};
+    fallback_shutter_parameter.key = "shutter-strobe";
+    fallback_shutter_parameter.type = bbb::dmx::fixture_parameter_type::u16;
+    fallback_shutter_parameter.channels = {"shutter.coarse", "shutter.fine"};
+    fallback_shutter_mode.parameters = {fallback_shutter_parameter};
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(fallback_shutter_mode, true);
+    require(shutter_mapping.ok, "semantic shutter fallback accepts likely shutter-strobe parameter");
+    require(shutter_mapping.value == 65535, "semantic shutter fallback opens u16 at max");
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(fallback_shutter_mode, false);
+    require(shutter_mapping.ok, "semantic shutter fallback closes likely shutter-strobe parameter");
+    require(shutter_mapping.value == 0, "semantic shutter fallback closes at zero");
+
+    bbb::dmx::fixture_mode no_shutter_mode{make_semantic_color_mode({"dimmer"})};
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(no_shutter_mode, true);
+    require(!shutter_mapping.ok, "semantic shutter mapping rejects unsupported fixture");
+
+    bbb::dmx::fixture_mode unrelated_open_range_mode{make_semantic_shutter_mode("gobo", "gobo")};
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(unrelated_open_range_mode, true);
+    require(!shutter_mapping.ok, "semantic shutter mapping ignores unrelated open ranges");
+
+    bbb::dmx::fixture_mode shared_channel_mode{};
+    shared_channel_mode.key = "shared-shutter-strobe";
+    shared_channel_mode.footprint = 1;
+    shared_channel_mode.channels = {make_u8_channel(1, "shutter_strobe")};
+    bbb::dmx::fixture_parameter shared_shutter_parameter{make_u8_parameter("shutter")};
+    shared_shutter_parameter.channels = {"shutter_strobe"};
+    shared_shutter_parameter.ranges = {
+        make_parameter_range(0, 31, "closed", "Closed"),
+        make_parameter_range(32, 63, "open", "Open")
+    };
+    bbb::dmx::fixture_parameter shared_strobe_parameter{make_u8_parameter("strobe")};
+    shared_strobe_parameter.channels = {"shutter_strobe"};
+    shared_channel_mode.parameters = {shared_shutter_parameter, shared_strobe_parameter};
+    bbb::dmx::fixture_profile shared_channel_profile{};
+    shared_channel_profile.key = "test.shutter.shared";
+    shared_channel_profile.modes = {shared_channel_mode};
+    bbb::dmx::fixture_instance shared_channel_fixture{};
+    shared_channel_fixture.id = "shutter_01";
+    shared_channel_fixture.profile = "test.shutter.shared";
+    shared_channel_fixture.mode = "shared-shutter-strobe";
+    shared_channel_fixture.universe = 1;
+    shared_channel_fixture.address = 1;
+    bbb::dmx::fixture_patch shared_channel_patch{};
+    shared_channel_patch.fixtures = {shared_channel_fixture};
+    bbb::dmx::fixture_mapper shared_channel_mapper{};
+    map_result = shared_channel_mapper.add_profile(shared_channel_profile);
+    require(map_result.ok, "semantic shutter shared channel mapper accepts profile");
+    map_result = shared_channel_mapper.set_patch(shared_channel_patch);
+    require(map_result.ok, "semantic shutter shared channel mapper accepts patch");
+    map_result = shared_channel_mapper.set_u8("shutter_01", "strobe", 99);
+    require(map_result.ok, "semantic shutter shared channel mapper seeds strobe");
+    require(shared_channel_mapper.universe(1).channel(1) == 99, "semantic shutter shared channel seed writes strobe channel");
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(shared_channel_mode, true);
+    require(shutter_mapping.ok, "semantic shutter shared channel produces open mapping");
+    map_result = shared_channel_mapper.set_u8("shutter_01", shutter_mapping.parameter, shutter_mapping.value);
+    require(map_result.ok, "semantic shutter shared channel applies open mapping");
+    require(shared_channel_mapper.universe(1).channel(1) == 47, "semantic shutter open overwrites shared strobe channel");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";

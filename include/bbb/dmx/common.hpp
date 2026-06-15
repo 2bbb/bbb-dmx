@@ -3,6 +3,7 @@
 #include "bbb/dmx/aim.hpp"
 #include "bbb/dmx/color_mapping.hpp"
 #include "bbb/dmx/math.hpp"
+#include "bbb/dmx/shutter_mapping.hpp"
 #include "bbb/dmx/tracking.hpp"
 #include "bbb/dmx/value.hpp"
 #include "bbb/dmx/fixture_mapper.hpp"

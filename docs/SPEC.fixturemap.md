@@ -346,6 +346,25 @@ colorall rgb8 255 204 0
 
 `colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY semantic model. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
 
+#### Semantic shutter input
+
+```max
+shutter spot_01 1
+shutter spot_01 0
+shutterall 1
+shutterall 0
+```
+
+`shutter` and `shutterall` express desired shutter state instead of raw `shutter`, `shutter-strobe`, or `strobe` DMX values. Numeric `1`/non-zero means open; `0` means close. Symbols `open`, `on`, `true`, `close`, `closed`, `off`, `false`, and `blackout` are also accepted.
+
+Resolution order is deliberately simple and deterministic:
+
+1. On likely shutter/strobe parameters, prefer range metadata whose `function` or `label` is `open` for opening, or `closed`/`close`/`blackout` for closing. Write the midpoint of the matching range.
+2. Prefer parameters named like `shutter`, then `shutter-strobe`, then other names containing `shutter`, then names containing `strobe`.
+3. If no matching range exists but a likely shutter/strobe parameter exists, write max (`255`, `65535`, or `16777215`) for open and `0` for close.
+
+If shutter and strobe share the same channel, the semantic shutter write intentionally overwrites that channel. `shutterall` skips fixtures without a supported shutter/strobe parameter; per-fixture `shutter` reports an error for unsupported fixtures.
+
 #### Raw channel override
 
 ```max
@@ -386,7 +405,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `color`, `colorall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `color`, `colorall`, `shutter`, `shutterall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.
