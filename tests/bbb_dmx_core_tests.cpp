@@ -758,12 +758,22 @@ int main() {
     jdc_strobe_mode.key = "jdc";
     jdc_strobe_mode.footprint = 11;
     jdc_strobe_mode.channels = {
+        make_labeled_u8_channel(3, "dimmer", "Dimmer"),
         make_labeled_u8_channel(4, "shutter", "StrobeDuration"),
         make_labeled_u8_channel(5, "shutter_2", "StrobeRate", 255),
         make_labeled_u8_channel(6, "shutter_3", "StrobeModeStrobe"),
+        make_labeled_u8_channel(8, "dimmer_2", "Dimmer"),
         make_labeled_u8_channel(9, "shutter_4", "StrobeDuration"),
         make_labeled_u8_channel(10, "shutter_5", "StrobeRate", 255),
-        make_labeled_u8_channel(11, "shutter_6", "StrobeModeStrobe")
+        make_labeled_u8_channel(11, "shutter_6", "StrobeModeStrobe"),
+        make_labeled_u8_channel(20, "dimmer_3", "Dimmer")
+    };
+    bbb::dmx::fixture_parameter jdc_dimmer{make_u8_parameter("dimmer")};
+    jdc_dimmer.channels = {"dimmer"};
+    jdc_dimmer.ranges = {
+        make_parameter_range(0, 0, "closed", "Closed"),
+        make_parameter_range(1, 254, "dimmer", "Dimmer"),
+        make_parameter_range(255, 255, "open", "Open")
     };
     bbb::dmx::fixture_parameter jdc_duration{make_u8_parameter("shutter")};
     jdc_duration.channels = {"shutter"};
@@ -779,6 +789,9 @@ int main() {
         make_parameter_range(1, 36, "strobe", "No Effect"),
         make_parameter_range(37, 40, "strobe", "Ramp up")
     };
+    bbb::dmx::fixture_parameter jdc_dimmer_2{make_u8_parameter("dimmer_2")};
+    jdc_dimmer_2.channels = {"dimmer_2"};
+    jdc_dimmer_2.ranges = jdc_dimmer.ranges;
     bbb::dmx::fixture_parameter jdc_duration_2{make_u8_parameter("shutter_4")};
     jdc_duration_2.channels = {"shutter_4"};
     jdc_duration_2.ranges = {make_parameter_range(0, 255, "strobe", "Duration")};
@@ -793,7 +806,10 @@ int main() {
         make_parameter_range(1, 36, "strobe", "Beam effect offset"),
         make_parameter_range(37, 40, "strobe", "Ramp up")
     };
-    jdc_strobe_mode.parameters = {jdc_duration, jdc_rate, jdc_mode, jdc_duration_2, jdc_rate_2, jdc_mode_2};
+    bbb::dmx::fixture_parameter jdc_dimmer_3{make_u8_parameter("dimmer_3")};
+    jdc_dimmer_3.channels = {"dimmer_3"};
+    jdc_dimmer_3.ranges = jdc_dimmer.ranges;
+    jdc_strobe_mode.parameters = {jdc_dimmer, jdc_duration, jdc_rate, jdc_mode, jdc_dimmer_2, jdc_duration_2, jdc_rate_2, jdc_mode_2, jdc_dimmer_3};
     const bbb::dmx::semantic_shutter_mappings jdc_open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(jdc_strobe_mode, true)};
     require(jdc_open_mappings.ok, "semantic shutter accepts GDTF strobe mode channels");
     const bbb::dmx::semantic_shutter_mapping *jdc_duration_mapping{find_shutter_mapping(jdc_open_mappings, "shutter")};
@@ -815,6 +831,13 @@ int main() {
     require(jdc_mode_mapping != nullptr && jdc_mode_mapping->value == 0, "semantic shutter close resets StrobeModeStrobe to no effect");
     jdc_mode_mapping_2 = find_shutter_mapping(jdc_closed_mappings, "shutter_6");
     require(jdc_mode_mapping_2 != nullptr && jdc_mode_mapping_2->value == 0, "semantic shutter close resets second StrobeModeStrobe to no effect");
+    const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping{find_shutter_mapping(jdc_closed_mappings, "dimmer")};
+    require(jdc_closed_dimmer_mapping != nullptr && jdc_closed_dimmer_mapping->value == 0, "semantic shutter close falls back to main dimmer closed");
+    const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping_2{find_shutter_mapping(jdc_closed_mappings, "dimmer_2")};
+    require(jdc_closed_dimmer_mapping_2 != nullptr && jdc_closed_dimmer_mapping_2->value == 0, "semantic shutter close falls back to second dimmer closed");
+    const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping_3{find_shutter_mapping(jdc_closed_mappings, "dimmer_3")};
+    require(jdc_closed_dimmer_mapping_3 != nullptr && jdc_closed_dimmer_mapping_3->value == 0, "semantic shutter close falls back to third dimmer closed");
+    require(find_shutter_mapping(jdc_open_mappings, "dimmer") == nullptr, "semantic shutter open does not force main dimmer open");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";

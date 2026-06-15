@@ -175,6 +175,11 @@ inline int shutter_parameter_base_score(const fixture_parameter &parameter) {
     return 0;
 }
 
+inline bool dimmer_parameter_is_likely(const fixture_mode &mode, const fixture_parameter &parameter) {
+    const std::string descriptor{shutter_parameter_descriptor(mode, parameter)};
+    return normalized_contains_any(descriptor, {"dimmer", "intensity"});
+}
+
 inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open);
 
 inline int shutter_range_score(const fixture_parameter &parameter, const fixture_parameter_range &range) {
@@ -270,6 +275,7 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
     const fixture_parameter *best_parameter{nullptr};
     int best_score{-1};
     std::vector<semantic_shutter_mapping> mappings{};
+    bool has_explicit_shutter_state_mapping{false};
 
     for(const auto &parameter : mode.parameters) {
         const int base_score{shutter_parameter_base_score(parameter)};
@@ -279,6 +285,7 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
         const fixture_parameter_range *range{best_shutter_range_for_state(parameter, open)};
         if(range) {
             append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
+            has_explicit_shutter_state_mapping = true;
         }
     }
 
@@ -297,6 +304,18 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
             continue;
         }
         append_semantic_shutter_mapping(mappings, parameter.key, parameter_clamped_default_value(parameter));
+    }
+
+    if(!open && !has_explicit_shutter_state_mapping) {
+        for(const auto &parameter : mode.parameters) {
+            if(!dimmer_parameter_is_likely(mode, parameter)) {
+                continue;
+            }
+            const fixture_parameter_range *range{best_shutter_range_for_state(parameter, false)};
+            if(range) {
+                append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
+            }
+        }
     }
 
     if(!mappings.empty()) {
