@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "bbb/dmx/fixture_profile.hpp"
 
@@ -25,6 +26,21 @@ public:
     }
 };
 
+struct semantic_shutter_mappings {
+public:
+    bool ok{false};
+    std::string message{};
+    std::vector<semantic_shutter_mapping> mappings{};
+
+    static semantic_shutter_mappings success(const std::vector<semantic_shutter_mapping> &parameter_mappings) {
+        return semantic_shutter_mappings{true, "", parameter_mappings};
+    }
+
+    static semantic_shutter_mappings failure(const std::string &message) {
+        return semantic_shutter_mappings{false, message, {}};
+    }
+};
+
 inline std::string normalized_semantic_key(const std::string &text) {
     std::string result;
     result.reserve(text.size());
@@ -37,12 +53,56 @@ inline std::string normalized_semantic_key(const std::string &text) {
     return result;
 }
 
+inline bool normalized_contains_any(const std::string &text, const std::vector<std::string> &needles) {
+    for(const auto &needle : needles) {
+        if(text.find(needle) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline std::string shutter_parameter_descriptor(const fixture_mode &mode, const fixture_parameter &parameter) {
+    std::string descriptor{parameter.key};
+    for(const auto &channel_key : parameter.channels) {
+        descriptor += " ";
+        descriptor += channel_key;
+        const fixture_channel *channel{mode.find_channel(channel_key)};
+        if(channel) {
+            descriptor += " ";
+            descriptor += channel->label;
+        }
+    }
+    return normalized_semantic_key(descriptor);
+}
+
 inline bool shutter_parameter_key_is_likely(const std::string &key) {
     const std::string normalized{normalized_semantic_key(key)};
     return normalized == "shutter" ||
         normalized == "shutterstrobe" ||
         normalized.find("shutter") != std::string::npos ||
         normalized.find("strobe") != std::string::npos;
+}
+
+inline bool shutter_parameter_is_strobe_mode_like(const fixture_mode &mode, const fixture_parameter &parameter) {
+    const std::string descriptor{shutter_parameter_descriptor(mode, parameter)};
+    return normalized_contains_any(descriptor, {
+        "strobemode",
+        "shuttermode",
+        "strobefx",
+        "strobeeffect"
+    });
+}
+
+inline bool shutter_parameter_is_rate_or_duration_like(const fixture_mode &mode, const fixture_parameter &parameter) {
+    const std::string descriptor{shutter_parameter_descriptor(mode, parameter)};
+    return normalized_contains_any(descriptor, {
+        "strobeduration",
+        "strobeperiod",
+        "stroberate",
+        "strobefrequency",
+        "strobespeed"
+    });
 }
 
 inline bool shutter_range_matches_state(const fixture_parameter_range &range, bool open) {
@@ -57,6 +117,25 @@ inline bool shutter_range_matches_state(const fixture_parameter_range &range, bo
         label == "closed" ||
         label == "close" ||
         label == "blackout";
+}
+
+inline bool shutter_range_is_no_effect(const fixture_parameter_range &range) {
+    const std::string function{normalized_semantic_key(range.function)};
+    const std::string label{normalized_semantic_key(range.label)};
+    return function == "noeffect" ||
+        function == "nofunction" ||
+        function == "nofunktion" ||
+        function == "none" ||
+        label == "noeffect" ||
+        label == "nofunction" ||
+        label == "nofunktion" ||
+        label == "none";
+}
+
+inline bool range_contains_value(const fixture_parameter_range &range, int value) {
+    const int minimum{std::min(range.from, range.to)};
+    const int maximum{std::max(range.from, range.to)};
+    return minimum <= value && value <= maximum;
 }
 
 inline int range_center_value(const fixture_parameter_range &range) {
@@ -92,35 +171,125 @@ inline int shutter_parameter_base_score(const fixture_parameter &parameter) {
     return 0;
 }
 
-inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixture_mode &mode, bool open) {
-    const fixture_parameter *best_parameter{nullptr};
+inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open);
+
+inline int shutter_range_score(const fixture_parameter &parameter, const fixture_parameter_range &range) {
+    const int minimum{std::min(range.from, range.to)};
+    const int maximum{std::max(range.from, range.to)};
+    const int width{maximum - minimum};
+    int score{1000 - width};
+    if(minimum == 0 && maximum == 0) {
+        score += 200;
+    }
+    if(range_contains_value(range, parameter.default_value)) {
+        score += 100;
+    }
+    return score;
+}
+
+inline const fixture_parameter_range *best_shutter_range_for_state(const fixture_parameter &parameter, bool open) {
     const fixture_parameter_range *best_range{nullptr};
     int best_score{-1};
+    for(const auto &range : parameter.ranges) {
+        if(!shutter_range_matches_state(range, open)) {
+            continue;
+        }
+        const int score{shutter_range_score(parameter, range)};
+        if(best_score < score) {
+            best_range = &range;
+            best_score = score;
+        }
+    }
+    return best_range;
+}
+
+inline const fixture_parameter_range *best_no_effect_range(const fixture_parameter &parameter) {
+    const fixture_parameter_range *best_range{nullptr};
+    int best_score{-1};
+    for(const auto &range : parameter.ranges) {
+        if(!shutter_range_is_no_effect(range)) {
+            continue;
+        }
+        const int score{shutter_range_score(parameter, range)};
+        if(best_score < score) {
+            best_range = &range;
+            best_score = score;
+        }
+    }
+    return best_range;
+}
+
+inline bool semantic_shutter_mapping_contains_parameter(
+    const std::vector<semantic_shutter_mapping> &mappings,
+    const std::string &parameter_key
+) {
+    for(const auto &mapping : mappings) {
+        if(mapping.parameter == parameter_key) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline void append_semantic_shutter_mapping(
+    std::vector<semantic_shutter_mapping> &mappings,
+    const std::string &parameter_key,
+    int value
+) {
+    if(semantic_shutter_mapping_contains_parameter(mappings, parameter_key)) {
+        return;
+    }
+    mappings.push_back(semantic_shutter_mapping::success(parameter_key, value));
+}
+
+inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixture_mode &mode, bool open) {
+    const semantic_shutter_mappings mappings{semantic_shutter_parameters_for_mode(mode, open)};
+    if(!mappings.ok) {
+        return semantic_shutter_mapping::failure(mappings.message);
+    }
+    if(mappings.mappings.empty()) {
+        return semantic_shutter_mapping::failure("fixture has no semantic shutter parameter");
+    }
+    return mappings.mappings.front();
+}
+
+inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open) {
+    const fixture_parameter *best_parameter{nullptr};
+    int best_score{-1};
+    std::vector<semantic_shutter_mapping> mappings{};
 
     for(const auto &parameter : mode.parameters) {
         const int base_score{shutter_parameter_base_score(parameter)};
         if(base_score <= 0) {
             continue;
         }
-        for(const auto &range : parameter.ranges) {
-            if(!shutter_range_matches_state(range, open)) {
+        const fixture_parameter_range *range{best_shutter_range_for_state(parameter, open)};
+        if(range) {
+            append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
+        }
+    }
+
+    if(open) {
+        for(const auto &parameter : mode.parameters) {
+            if(!shutter_parameter_is_strobe_mode_like(mode, parameter)) {
                 continue;
             }
-            const int score{1000 + base_score};
-            if(best_score < score) {
-                best_parameter = &parameter;
-                best_range = &range;
-                best_score = score;
+            const fixture_parameter_range *range{best_no_effect_range(parameter)};
+            if(range) {
+                append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
             }
         }
     }
 
-    if(best_parameter && best_range) {
-        return semantic_shutter_mapping::success(best_parameter->key, range_center_value(*best_range));
+    if(!mappings.empty()) {
+        return semantic_shutter_mappings::success(mappings);
     }
 
     for(const auto &parameter : mode.parameters) {
         if(!shutter_parameter_key_is_likely(parameter.key)) {
+            continue;
+        }
+        if(open && shutter_parameter_is_rate_or_duration_like(mode, parameter)) {
             continue;
         }
         const int score{shutter_parameter_base_score(parameter)};
@@ -131,10 +300,12 @@ inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixtur
     }
 
     if(best_parameter) {
-        return semantic_shutter_mapping::success(best_parameter->key, open ? parameter_max_value(*best_parameter) : 0);
+        return semantic_shutter_mappings::success({
+            semantic_shutter_mapping::success(best_parameter->key, open ? parameter_max_value(*best_parameter) : 0)
+        });
     }
 
-    return semantic_shutter_mapping::failure("fixture has no semantic shutter parameter");
+    return semantic_shutter_mappings::failure("fixture has no semantic shutter parameter");
 }
 
 } // namespace bbb::dmx

@@ -35,6 +35,15 @@ const double *find_semantic_parameter(const bbb::dmx::semantic_color_mapping &ma
     return nullptr;
 }
 
+const bbb::dmx::semantic_shutter_mapping *find_shutter_mapping(const bbb::dmx::semantic_shutter_mappings &mappings, const std::string &key) {
+    for(const auto &mapping : mappings.mappings) {
+        if(mapping.parameter == key) {
+            return &mapping;
+        }
+    }
+    return nullptr;
+}
+
 bbb::dmx::fixture_parameter make_u8_parameter(const std::string &key) {
     bbb::dmx::fixture_parameter parameter{};
     parameter.key = key;
@@ -48,6 +57,12 @@ bbb::dmx::fixture_channel make_u8_channel(int offset, const std::string &key, in
     channel.offset = offset;
     channel.key = key;
     channel.default_value = default_value;
+    return channel;
+}
+
+bbb::dmx::fixture_channel make_labeled_u8_channel(int offset, const std::string &key, const std::string &label, int default_value = 0) {
+    bbb::dmx::fixture_channel channel{make_u8_channel(offset, key, default_value)};
+    channel.label = label;
     return channel;
 }
 
@@ -738,6 +753,57 @@ int main() {
     map_result = shared_channel_mapper.set_u8("shutter_01", shutter_mapping.parameter, shutter_mapping.value);
     require(map_result.ok, "semantic shutter shared channel applies open mapping");
     require(shared_channel_mapper.universe(1).channel(1) == 47, "semantic shutter open overwrites shared strobe channel");
+
+    bbb::dmx::fixture_mode jdc_strobe_mode{};
+    jdc_strobe_mode.key = "jdc";
+    jdc_strobe_mode.footprint = 11;
+    jdc_strobe_mode.channels = {
+        make_labeled_u8_channel(4, "shutter", "StrobeDuration"),
+        make_labeled_u8_channel(5, "shutter_2", "StrobeRate", 255),
+        make_labeled_u8_channel(6, "shutter_3", "StrobeModeStrobe"),
+        make_labeled_u8_channel(9, "shutter_4", "StrobeDuration"),
+        make_labeled_u8_channel(10, "shutter_5", "StrobeRate", 255),
+        make_labeled_u8_channel(11, "shutter_6", "StrobeModeStrobe")
+    };
+    bbb::dmx::fixture_parameter jdc_duration{make_u8_parameter("shutter")};
+    jdc_duration.channels = {"shutter"};
+    jdc_duration.ranges = {make_parameter_range(0, 255, "strobe", "Duration")};
+    bbb::dmx::fixture_parameter jdc_rate{make_u8_parameter("shutter_2")};
+    jdc_rate.channels = {"shutter_2"};
+    jdc_rate.default_value = 255;
+    jdc_rate.ranges = {make_parameter_range(0, 255, "strobe", "Rate")};
+    bbb::dmx::fixture_parameter jdc_mode{make_u8_parameter("shutter_3")};
+    jdc_mode.channels = {"shutter_3"};
+    jdc_mode.ranges = {
+        make_parameter_range(0, 0, "strobe", "No effect"),
+        make_parameter_range(1, 36, "strobe", "No Effect"),
+        make_parameter_range(37, 40, "strobe", "Ramp up")
+    };
+    bbb::dmx::fixture_parameter jdc_duration_2{make_u8_parameter("shutter_4")};
+    jdc_duration_2.channels = {"shutter_4"};
+    jdc_duration_2.ranges = {make_parameter_range(0, 255, "strobe", "Duration")};
+    bbb::dmx::fixture_parameter jdc_rate_2{make_u8_parameter("shutter_5")};
+    jdc_rate_2.channels = {"shutter_5"};
+    jdc_rate_2.default_value = 255;
+    jdc_rate_2.ranges = {make_parameter_range(0, 255, "strobe", "Rate")};
+    bbb::dmx::fixture_parameter jdc_mode_2{make_u8_parameter("shutter_6")};
+    jdc_mode_2.channels = {"shutter_6"};
+    jdc_mode_2.ranges = {
+        make_parameter_range(0, 0, "strobe", "No effect"),
+        make_parameter_range(1, 36, "strobe", "Beam effect offset"),
+        make_parameter_range(37, 40, "strobe", "Ramp up")
+    };
+    jdc_strobe_mode.parameters = {jdc_duration, jdc_rate, jdc_mode, jdc_duration_2, jdc_rate_2, jdc_mode_2};
+    const bbb::dmx::semantic_shutter_mappings jdc_open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(jdc_strobe_mode, true)};
+    require(jdc_open_mappings.ok, "semantic shutter accepts GDTF strobe mode channels");
+    require(find_shutter_mapping(jdc_open_mappings, "shutter") == nullptr, "semantic shutter open does not maximize StrobeDuration");
+    require(find_shutter_mapping(jdc_open_mappings, "shutter_2") == nullptr, "semantic shutter open does not write StrobeRate");
+    require(find_shutter_mapping(jdc_open_mappings, "shutter_4") == nullptr, "semantic shutter open does not maximize second StrobeDuration");
+    require(find_shutter_mapping(jdc_open_mappings, "shutter_5") == nullptr, "semantic shutter open does not write second StrobeRate");
+    const bbb::dmx::semantic_shutter_mapping *jdc_mode_mapping{find_shutter_mapping(jdc_open_mappings, "shutter_3")};
+    require(jdc_mode_mapping != nullptr && jdc_mode_mapping->value == 0, "semantic shutter open resets StrobeModeStrobe to no effect");
+    const bbb::dmx::semantic_shutter_mapping *jdc_mode_mapping_2{find_shutter_mapping(jdc_open_mappings, "shutter_6")};
+    require(jdc_mode_mapping_2 != nullptr && jdc_mode_mapping_2->value == 0, "semantic shutter open resets second StrobeModeStrobe to no effect");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";
