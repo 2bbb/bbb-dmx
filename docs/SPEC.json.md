@@ -145,6 +145,7 @@ Typical path: `fixtures/*.json`.
 | `manufacturer` | string | recommended | Human-readable manufacturer. Current runtime allows omission and treats it as empty. |
 | `model` | string | recommended | Human-readable model. Current runtime allows omission and treats it as empty. |
 | `photometry` | object | no | Optional physical beam/optics metadata. Consumers must tolerate absence and use their own fallback defaults. |
+| `wheels` | array | no | Optional wheel metadata, primarily imported from GDTF `Wheels`. Color wheel fallback uses this to map RGB requests to nearest discrete slots. |
 | `modes` | object | yes | Map of `mode_key -> mode object`. |
 
 ### 2.3 Photometry object
@@ -161,7 +162,50 @@ Typical path: `fixtures/*.json`.
 
 For GDTF/MVR conversion, `bbb-dmx-convert` reads the first `<Beam>` node it finds in the geometry tree. Multi-emitter fixtures need a future schema version instead of overloading v1.
 
-### 2.4 Mode object
+### 2.4 Wheels
+
+`wheels` preserves discrete wheel metadata separately from DMX parameter ranges. This is intentionally optional: fixtures with additive RGB or subtractive CMY do not need it. Color wheels, gobo wheels, animation wheels, prism wheels, and similar indexed devices can define slots here and reference them from parameter ranges.
+
+```json
+"wheels": [
+  {
+    "id": "ColorWheel1",
+    "label": "Color Wheel 1",
+    "type": "color",
+    "slots": [
+      { "index": 1, "id": "open", "label": "Open", "kind": "open", "rgb": [255, 255, 255] },
+      { "index": 2, "id": "red", "label": "Red", "kind": "color", "rgb": [255, 0, 0] },
+      { "index": 3, "id": "blue", "label": "Blue", "kind": "color", "cie_xyY": [0.15, 0.06, 100.0] }
+    ]
+  }
+]
+```
+
+Wheel object fields:
+
+| Field | Type | Required | Meaning |
+|---|---:|---:|---|
+| `id` | string | yes | Stable wheel id. GDTF `Wheel/@Name` is the preferred source. |
+| `label` | string | no | Human-readable label. |
+| `type` | string | no | Recommended values: `color`, `gobo`, `animation`, `prism`, or `generic`. |
+| `slots` | array | no | Ordered slot metadata. GDTF slot indexes are 1-based and should stay 1-based here. |
+
+Slot object fields:
+
+| Field | Type | Required | Meaning |
+|---|---:|---:|---|
+| `index` | integer | yes | 1-based slot index. |
+| `id` | string | no | Stable slot slug. |
+| `label` | string | no | Human label, usually GDTF `Slot/@Name`. |
+| `kind` | string | no | `open`, `color`, `filter`, `split`, `media`, or any importer-specific hint. |
+| `rgb` | `[r,g,b]` integers | no | Approximate sRGB display/matching color, `0..255`. |
+| `cie_xyY` | `[x,y,Y]` numbers | no | GDTF-style CIE color data. Consumers may convert it for matching/display. |
+| `filter` | string | no | Optional filter/media reference. |
+| `media` | string | no | Optional media filename/reference. |
+
+For semantic color fallback, `rgb` is preferred over `cie_xyY`; if neither exists consumers may attempt conservative name matching from slot/range labels.
+
+### 2.5 Mode object
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
@@ -172,7 +216,7 @@ For GDTF/MVR conversion, `bbb-dmx-convert` reads the first `<Beam>` node it find
 
 `channels[].offset` values are relative to the fixture start address and are 1-based. A fixture patched at address `17` with a channel offset `3` writes absolute DMX address `19`.
 
-### 2.5 Channel object
+### 2.6 Channel object
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
@@ -184,7 +228,7 @@ For GDTF/MVR conversion, `bbb-dmx-convert` reads the first `<Beam>` node it find
 
 Do not define duplicate `offset` values or duplicate `key` values inside one mode. The current JSON loader does not fully police this, but fixture writers will behave ambiguously.
 
-### 2.6 Parameter object
+### 2.7 Parameter object
 
 A parameter maps one semantic control value to one or more channel keys.
 
@@ -196,6 +240,7 @@ A parameter maps one semantic control value to one or more channel keys.
 | `byte_order` | string | no | `coarsefine` | Byte order for `u16`/`u24`. |
 | `default` | integer | no | `0` | Semantic default before splitting. For `u8` max is `255`; for `u16` max is `65535`; for `u24` max is `16777215`. |
 | `range_degrees` | number | pan/tilt recommended | `0` | Physical movement range used by mover tracking. |
+| `wheel` | string | no | `""` | Optional top-level `wheels[].id` referenced by this stepped parameter. Used by color wheel fallback and editor UIs. |
 | `ranges` | array | no | absent | Inclusive raw-value lookup table for shutter modes, strobe ranges, color/gobo wheel slots, prism/frost/iris modes, and similar stepped DMX parameters. |
 
 Canonical channel counts:
@@ -234,9 +279,11 @@ Canonical channel counts:
 | `from` / `to` | integer | yes | Inclusive raw-value bounds in the parameter domain. |
 | `function` | string | yes | Semantic slug. Recommended shutter vocabulary is `closed`, `open`, `strobe`, `pulse`, `random`; wheel slots and other fixture-specific modes may use freeform slugs such as `red`, `gobo.1`, `rainbow`, `prism.3facet`, or `frost.heavy`. |
 | `label` | string | no | Human-readable label, usually a GDTF `ChannelSet` or `ChannelFunction` name. |
+| `wheel` | string | no | Optional override for the parameter-level wheel id. Useful when one parameter references several wheels. |
+| `wheel_slot` | integer | no | 1-based slot index in the referenced `wheels[]` entry. GDTF source is `ChannelSet/@WheelSlotIndex`. |
 | `physical_from` / `physical_to` | number | no | Physical values interpolated across the range when meaningful, e.g. strobe frequency in Hz. |
 
-Consumers must not assume `function` is exhaustive. Unknown slugs are valid and should be ignored, displayed as labels, or treated as generic slots. `bbb-dmx-lint` reports schema errors for impossible bounds and warnings for gaps/overlaps, but JSON Schema cannot fully express value-domain coverage.
+For a color wheel parameter, set `parameter.wheel` to the top-level wheel id and put `wheel_slot` on each range that maps to a discrete slot. Consumers must not assume `function` is exhaustive. Unknown slugs are valid and should be ignored, displayed as labels, or treated as generic slots. `bbb-dmx-lint` reports schema errors for impossible bounds and warnings for gaps/overlaps, but JSON Schema cannot fully express value-domain coverage.
 
 ## 3. Fixture patch: `bbb.dmx.patch.v2`
 

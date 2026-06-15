@@ -50,6 +50,70 @@ inline bool json_optional_double_present(const json_value &object, const std::st
     return true;
 }
 
+inline bool json_optional_int_present(const json_value &object, const std::string &key, int &value, bool &present, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        present = false;
+        return true;
+    }
+    if(child->type != json_type::number || !std::isfinite(child->number_value) || std::floor(child->number_value) != child->number_value) {
+        error = "expected integer: " + key;
+        return false;
+    }
+    value = (int)child->number_value;
+    present = true;
+    return true;
+}
+
+inline bool json_optional_rgb(const json_value &object, const std::string &key, fixture_wheel_slot_color &color, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        color.has_rgb = false;
+        return true;
+    }
+    if(child->type != json_type::array || child->array_value.size() < 3) {
+        error = "expected 3-integer array: " + key;
+        return false;
+    }
+    int values[3]{0, 0, 0};
+    for(std::size_t index = 0; index < 3; index++) {
+        const json_value &entry{child->array_value[index]};
+        if(entry.type != json_type::number || !std::isfinite(entry.number_value) || std::floor(entry.number_value) != entry.number_value) {
+            error = "expected integer rgb element: " + key;
+            return false;
+        }
+        values[index] = std::max(0, std::min(255, (int)entry.number_value));
+    }
+    color.has_rgb = true;
+    color.red = values[0];
+    color.green = values[1];
+    color.blue = values[2];
+    return true;
+}
+
+inline bool json_optional_cie_xyY(const json_value &object, const std::string &key, fixture_wheel_slot_color &color, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        color.has_cie_xyY = false;
+        return true;
+    }
+    if(child->type != json_type::array || child->array_value.size() < 3) {
+        error = "expected 3-number array: " + key;
+        return false;
+    }
+    for(std::size_t index = 0; index < 3; index++) {
+        if(child->array_value[index].type != json_type::number) {
+            error = "expected numeric cie_xyY element: " + key;
+            return false;
+        }
+    }
+    color.has_cie_xyY = true;
+    color.cie_x = child->array_value[0].number_value;
+    color.cie_y = child->array_value[1].number_value;
+    color.cie_Y = child->array_value[2].number_value;
+    return true;
+}
+
 inline bool json_string_or_integer_id(const json_value &object, const std::string &key, std::string &value, bool required, std::string &error) {
     const json_value *child{object.find(key)};
     if(!child) {
@@ -139,6 +203,53 @@ inline mapper_result fixture_profile_from_json(const json_value &root, fixture_p
         }
     }
 
+    const json_value *wheels{root.find("wheels")};
+    if(wheels) {
+        if(wheels->type != json_type::array) {
+            return mapper_result::failure("profile wheels must be array");
+        }
+        for(const auto &wheel_value : wheels->array_value) {
+            if(wheel_value.type != json_type::object) {
+                return mapper_result::failure("wheel must be object");
+            }
+            fixture_wheel wheel{};
+            if(!json_string(wheel_value, "id", wheel.id, true, error)) {
+                return mapper_result::failure(error);
+            }
+            json_string(wheel_value, "label", wheel.label, false, error);
+            json_string(wheel_value, "type", wheel.type, false, error);
+
+            const json_value *slots{wheel_value.find("slots")};
+            if(slots) {
+                if(slots->type != json_type::array) {
+                    return mapper_result::failure("wheel slots must be array: " + wheel.id);
+                }
+                for(const auto &slot_value : slots->array_value) {
+                    if(slot_value.type != json_type::object) {
+                        return mapper_result::failure("wheel slot must be object: " + wheel.id);
+                    }
+                    fixture_wheel_slot slot{};
+                    if(!json_int(slot_value, "index", slot.index, true, error)) {
+                        return mapper_result::failure(error);
+                    }
+                    json_string(slot_value, "id", slot.id, false, error);
+                    json_string(slot_value, "label", slot.label, false, error);
+                    json_string(slot_value, "kind", slot.kind, false, error);
+                    json_string(slot_value, "filter", slot.filter, false, error);
+                    json_string(slot_value, "media", slot.media, false, error);
+                    if(!json_optional_rgb(slot_value, "rgb", slot.color, error)) {
+                        return mapper_result::failure(error);
+                    }
+                    if(!json_optional_cie_xyY(slot_value, "cie_xyY", slot.color, error)) {
+                        return mapper_result::failure(error);
+                    }
+                    wheel.slots.push_back(slot);
+                }
+            }
+            profile.wheels.push_back(wheel);
+        }
+    }
+
     const json_value *modes{root.find("modes")};
     if(!modes || modes->type != json_type::object) {
         return mapper_result::failure("profile modes must be object");
@@ -194,6 +305,7 @@ inline mapper_result fixture_profile_from_json(const json_value &root, fixture_p
                 }
                 json_int(parameter_pair.second, "default", parameter.default_value, false, error);
                 json_double(parameter_pair.second, "range_degrees", parameter.range_degrees, false, error);
+                json_string(parameter_pair.second, "wheel", parameter.wheel, false, error);
                 std::string order_text{"coarsefine"};
                 json_string(parameter_pair.second, "byte_order", order_text, false, error);
                 if(!parse_byte_order_string(order_text, parameter.order)) {
@@ -220,6 +332,10 @@ inline mapper_result fixture_profile_from_json(const json_value &root, fixture_p
                             return mapper_result::failure(error);
                         }
                         json_string(range_value, "label", range.label, false, error);
+                        json_string(range_value, "wheel", range.wheel, false, error);
+                        if(!json_optional_int_present(range_value, "wheel_slot", range.wheel_slot, range.has_wheel_slot, error)) {
+                            return mapper_result::failure(error);
+                        }
                         if(!json_optional_double_present(range_value, "physical_from", range.physical_from, range.has_physical_from, error)) {
                             return mapper_result::failure(error);
                         }

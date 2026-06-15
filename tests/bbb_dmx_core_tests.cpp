@@ -386,6 +386,18 @@ int main() {
             "luminous_flux": 1000.0,
             "color_temperature": 6500.0
         },
+        "wheels": [
+            {
+                "id": "ColorWheel1",
+                "label": "Color Wheel 1",
+                "type": "color",
+                "slots": [
+                    { "index": 1, "id": "open", "label": "Open", "kind": "open", "rgb": [255, 255, 255] },
+                    { "index": 2, "id": "red", "label": "Red", "kind": "color", "rgb": [255, 0, 0] },
+                    { "index": 3, "id": "blue", "label": "Blue", "kind": "color", "cie_xyY": [0.15, 0.06, 100.0] }
+                ]
+            }
+        ],
         "modes": {
             "basic16": {
                 "footprint": 6,
@@ -401,6 +413,16 @@ int main() {
                     "pan": { "type": "u16", "channels": ["pan.coarse", "pan.fine"], "byte_order": "coarsefine", "default": 32768 },
                     "tilt": { "type": "u16", "channels": ["tilt.coarse", "tilt.fine"], "byte_order": "coarsefine", "default": 32768 },
                     "color24": { "type": "u24", "channels": ["pan.coarse", "pan.fine", "tilt.coarse"], "byte_order": "coarsemidfine", "default": 8388608 },
+                    "color_wheel": {
+                        "type": "enum",
+                        "channel": "shutter",
+                        "wheel": "ColorWheel1",
+                        "ranges": [
+                            { "from": 0, "to": 9, "function": "open", "label": "Open", "wheel_slot": 1 },
+                            { "from": 10, "to": 19, "function": "red", "label": "Red", "wheel_slot": 2 },
+                            { "from": 20, "to": 29, "function": "blue", "label": "Blue", "wheel_slot": 3 }
+                        ]
+                    },
                     "shutter": {
                         "type": "u8",
                         "channel": "shutter",
@@ -431,6 +453,10 @@ int main() {
     require(nearly_equal(parsed_profile.photometry.luminous_flux, 1000.0), "fixture JSON photometry luminous flux value");
     require(parsed_profile.photometry.has_color_temperature, "fixture JSON photometry color temperature present");
     require(nearly_equal(parsed_profile.photometry.color_temperature, 6500.0), "fixture JSON photometry color temperature value");
+    require(parsed_profile.wheels.size() == 1, "fixture JSON wheel count");
+    require(parsed_profile.wheels[0].slots.size() == 3, "fixture JSON wheel slot count");
+    require(parsed_profile.wheels[0].slots[1].color.has_rgb, "fixture JSON wheel slot rgb present");
+    require(parsed_profile.wheels[0].slots[2].color.has_cie_xyY, "fixture JSON wheel slot cie present");
     require(parsed_profile.modes[0].channels.size() == 6, "fixture JSON channel count");
     const bbb::dmx::fixture_parameter *parsed_color24{parsed_profile.modes[0].find_parameter("color24")};
     require(parsed_color24 != nullptr, "fixture JSON u24 parameter exists");
@@ -444,6 +470,10 @@ int main() {
     require(parsed_shutter->ranges[2].has_physical_from && parsed_shutter->ranges[2].has_physical_to, "fixture JSON shutter physical range present");
     require(nearly_equal(parsed_shutter->ranges[2].physical_from, 0.5), "fixture JSON shutter physical from");
     require(nearly_equal(parsed_shutter->ranges[2].physical_to, 10.0), "fixture JSON shutter physical to");
+    const bbb::dmx::fixture_parameter *parsed_color_wheel{parsed_profile.modes[0].find_parameter("color_wheel")};
+    require(parsed_color_wheel != nullptr, "fixture JSON color wheel parameter exists");
+    require(parsed_color_wheel->wheel == "ColorWheel1", "fixture JSON color wheel parameter link");
+    require(parsed_color_wheel->ranges[1].has_wheel_slot && parsed_color_wheel->ranges[1].wheel_slot == 2, "fixture JSON color wheel range slot");
 
     const std::string patch_json{R"json({
         "schema": "bbb.dmx.patch.v2",
@@ -535,6 +565,56 @@ int main() {
         bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0)
     );
     require(!color_mapping.ok, "semantic color mapping rejects unsupported fixture");
+
+    bbb::dmx::fixture_profile wheel_profile{};
+    wheel_profile.key = "test.colorwheel";
+    bbb::dmx::fixture_wheel color_wheel{};
+    color_wheel.id = "ColorWheel1";
+    color_wheel.type = "color";
+    color_wheel.slots = {
+        bbb::dmx::fixture_wheel_slot{1, "open", "Open", "open", "", "", bbb::dmx::fixture_wheel_slot_color{false, 0.0, 0.0, 0.0, true, 255, 255, 255}},
+        bbb::dmx::fixture_wheel_slot{2, "red", "Red", "color", "", "", bbb::dmx::fixture_wheel_slot_color{false, 0.0, 0.0, 0.0, true, 255, 0, 0}},
+        bbb::dmx::fixture_wheel_slot{3, "blue", "Blue", "color", "", "", bbb::dmx::fixture_wheel_slot_color{false, 0.0, 0.0, 0.0, true, 0, 0, 255}}
+    };
+    bbb::dmx::fixture_mode wheel_mode{};
+    wheel_mode.key = "wheel";
+    wheel_mode.footprint = 1;
+    wheel_mode.channels = {make_u8_channel(1, "color_wheel")};
+    bbb::dmx::fixture_parameter wheel_parameter{make_u8_parameter("color_wheel")};
+    wheel_parameter.type = bbb::dmx::fixture_parameter_type::enum_u8;
+    wheel_parameter.channels = {"color_wheel"};
+    wheel_parameter.wheel = "ColorWheel1";
+    wheel_parameter.ranges = {
+        make_parameter_range(0, 9, "open", "Open"),
+        make_parameter_range(10, 19, "red", "Red"),
+        make_parameter_range(20, 29, "blue", "Blue")
+    };
+    wheel_parameter.ranges[0].has_wheel_slot = true;
+    wheel_parameter.ranges[0].wheel_slot = 1;
+    wheel_parameter.ranges[1].has_wheel_slot = true;
+    wheel_parameter.ranges[1].wheel_slot = 2;
+    wheel_parameter.ranges[2].has_wheel_slot = true;
+    wheel_parameter.ranges[2].wheel_slot = 3;
+    wheel_mode.parameters = {wheel_parameter};
+    wheel_profile.wheels = {color_wheel};
+    wheel_profile.modes = {wheel_mode};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.0, 0.0),
+        bbb::dmx::semantic_color_options{true, false}
+    );
+    require(!color_mapping.ok, "semantic color wheel fallback is opt-in");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.0, 0.0),
+        bbb::dmx::semantic_color_options{true, true}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback maps nearest slot");
+    require(color_mapping.parameters.size() == 1, "semantic color wheel fallback writes one parameter");
+    require(color_mapping.parameters[0].first == "color_wheel", "semantic color wheel fallback writes color wheel parameter");
+    require(nearly_equal(color_mapping.parameters[0].second, 14.0 / 255.0), "semantic color wheel fallback uses range center");
 
     bbb::dmx::fixture_mode shutter_mode{make_semantic_shutter_mode("shutter", "shutter")};
     bbb::dmx::semantic_shutter_mapping shutter_mapping{bbb::dmx::semantic_shutter_parameter_for_mode(shutter_mode, true)};
