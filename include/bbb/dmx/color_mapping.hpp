@@ -136,6 +136,48 @@ inline double color_component_for_associated_dimmer(double component, double int
     return std::max(0.0, std::min(1.0, component / intensity));
 }
 
+inline const fixture_parameter *first_dimmer_parameter(const fixture_mode &mode) {
+    if(const fixture_parameter *parameter = mode.find_parameter("dimmer")) {
+        return parameter;
+    }
+    for(const auto &parameter : mode.parameters) {
+        if(color_parameter_is_dimmer_like(parameter)) {
+            return &parameter;
+        }
+    }
+    return nullptr;
+}
+
+inline semantic_color_mapping semantic_intensity_parameters_for_mode(const fixture_mode &mode, double intensity) {
+    const double clamped_intensity{clamp_normalized_color(intensity)};
+
+    if(
+        mode_has_semantic_parameter(mode, "red") &&
+        mode_has_semantic_parameter(mode, "green") &&
+        mode_has_semantic_parameter(mode, "blue")
+    ) {
+        if(const fixture_parameter *parameter = associated_color_dimmer_parameter(mode, {"red", "green", "blue", "white"})) {
+            return semantic_color_mapping::success({{parameter->key, clamped_intensity}});
+        }
+    }
+
+    if(
+        mode_has_semantic_parameter(mode, "cyan") &&
+        mode_has_semantic_parameter(mode, "magenta") &&
+        mode_has_semantic_parameter(mode, "yellow")
+    ) {
+        if(const fixture_parameter *parameter = associated_color_dimmer_parameter(mode, {"cyan", "magenta", "yellow"})) {
+            return semantic_color_mapping::success({{parameter->key, clamped_intensity}});
+        }
+    }
+
+    if(const fixture_parameter *parameter = first_dimmer_parameter(mode)) {
+        return semantic_color_mapping::success({{parameter->key, clamped_intensity}});
+    }
+
+    return semantic_color_mapping::failure("fixture has no semantic intensity parameter");
+}
+
 inline std::string normalized_color_key(const std::string &text) {
     std::string result;
     result.reserve(text.size());
