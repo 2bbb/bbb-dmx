@@ -333,6 +333,18 @@ nset spot_01 tilt 0.5
 
 `nset` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`.
 
+#### Semantic color input
+
+```max
+color spot_01 rgb 1.0 0.8 0.0
+colorall rgb 1.0 0.8 0.0
+colorall rgb8 255 204 0
+```
+
+`color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)`. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
+
+`colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY semantic model. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
+
 #### Raw channel override
 
 ```max
@@ -373,7 +385,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `color`, `colorall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.
