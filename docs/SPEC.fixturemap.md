@@ -284,7 +284,7 @@ Attributes implemented today:
 | `@default_pan_range` | float | `540.` | Fallback pan range in degrees when a profile omits `pan.range_degrees`. |
 | `@default_tilt_range` | float | `270.` | Fallback tilt range in degrees when a profile omits `tilt.range_degrees`. |
 | `@track_strict` | bool | `0` | If non-zero, `trackall` errors on fixtures without pan/tilt instead of skipping them. |
-| `@color_use_white` | bool | `1` | RGBW behavior for `color`/`colorall`: extract white from RGB when enabled, force white to zero when disabled. |
+| `@color_use_white` | bool | `1` | RGBW behavior for `color`/`colorall`: extract white from RGB when enabled, leave white untouched when disabled. |
 
 Outlets:
 
@@ -342,7 +342,7 @@ colorall rgb 1.0 0.8 0.0
 colorall rgb8 255 204 0
 ```
 
-`color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, `blue`, and `white = 0`. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
+`color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, and `blue`; `white` is left untouched so it can be managed separately. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
 
 `colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY semantic model. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
 
