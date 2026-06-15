@@ -154,6 +154,10 @@ inline int parameter_max_value(const fixture_parameter &parameter) {
     return 255;
 }
 
+inline int parameter_clamped_default_value(const fixture_parameter &parameter) {
+    return std::max(0, std::min(parameter_max_value(parameter), parameter.default_value));
+}
+
 inline int shutter_parameter_base_score(const fixture_parameter &parameter) {
     const std::string normalized{normalized_semantic_key(parameter.key)};
     if(normalized == "shutter") {
@@ -242,6 +246,15 @@ inline void append_semantic_shutter_mapping(
     mappings.push_back(semantic_shutter_mapping::success(parameter_key, value));
 }
 
+inline bool shutter_parameter_should_reset_to_no_effect(const fixture_mode &mode, const fixture_parameter &parameter) {
+    if(shutter_parameter_is_strobe_mode_like(mode, parameter)) {
+        return true;
+    }
+    return shutter_parameter_key_is_likely(parameter.key) &&
+        !shutter_parameter_is_rate_or_duration_like(mode, parameter) &&
+        best_no_effect_range(parameter) != nullptr;
+}
+
 inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixture_mode &mode, bool open) {
     const semantic_shutter_mappings mappings{semantic_shutter_parameters_for_mode(mode, open)};
     if(!mappings.ok) {
@@ -269,16 +282,21 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
         }
     }
 
-    if(open) {
-        for(const auto &parameter : mode.parameters) {
-            if(!shutter_parameter_is_strobe_mode_like(mode, parameter)) {
-                continue;
-            }
-            const fixture_parameter_range *range{best_no_effect_range(parameter)};
-            if(range) {
-                append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
-            }
+    for(const auto &parameter : mode.parameters) {
+        if(!shutter_parameter_should_reset_to_no_effect(mode, parameter)) {
+            continue;
         }
+        const fixture_parameter_range *range{best_no_effect_range(parameter)};
+        if(range) {
+            append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
+        }
+    }
+
+    for(const auto &parameter : mode.parameters) {
+        if(!shutter_parameter_is_rate_or_duration_like(mode, parameter)) {
+            continue;
+        }
+        append_semantic_shutter_mapping(mappings, parameter.key, parameter_clamped_default_value(parameter));
     }
 
     if(!mappings.empty()) {

@@ -796,14 +796,25 @@ int main() {
     jdc_strobe_mode.parameters = {jdc_duration, jdc_rate, jdc_mode, jdc_duration_2, jdc_rate_2, jdc_mode_2};
     const bbb::dmx::semantic_shutter_mappings jdc_open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(jdc_strobe_mode, true)};
     require(jdc_open_mappings.ok, "semantic shutter accepts GDTF strobe mode channels");
-    require(find_shutter_mapping(jdc_open_mappings, "shutter") == nullptr, "semantic shutter open does not maximize StrobeDuration");
-    require(find_shutter_mapping(jdc_open_mappings, "shutter_2") == nullptr, "semantic shutter open does not write StrobeRate");
-    require(find_shutter_mapping(jdc_open_mappings, "shutter_4") == nullptr, "semantic shutter open does not maximize second StrobeDuration");
-    require(find_shutter_mapping(jdc_open_mappings, "shutter_5") == nullptr, "semantic shutter open does not write second StrobeRate");
+    const bbb::dmx::semantic_shutter_mapping *jdc_duration_mapping{find_shutter_mapping(jdc_open_mappings, "shutter")};
+    require(jdc_duration_mapping != nullptr && jdc_duration_mapping->value == 0, "semantic shutter open resets StrobeDuration to default instead of max");
+    const bbb::dmx::semantic_shutter_mapping *jdc_rate_mapping{find_shutter_mapping(jdc_open_mappings, "shutter_2")};
+    require(jdc_rate_mapping != nullptr && jdc_rate_mapping->value == 255, "semantic shutter open resets StrobeRate to default");
+    const bbb::dmx::semantic_shutter_mapping *jdc_duration_mapping_2{find_shutter_mapping(jdc_open_mappings, "shutter_4")};
+    require(jdc_duration_mapping_2 != nullptr && jdc_duration_mapping_2->value == 0, "semantic shutter open resets second StrobeDuration to default instead of max");
+    const bbb::dmx::semantic_shutter_mapping *jdc_rate_mapping_2{find_shutter_mapping(jdc_open_mappings, "shutter_5")};
+    require(jdc_rate_mapping_2 != nullptr && jdc_rate_mapping_2->value == 255, "semantic shutter open resets second StrobeRate to default");
     const bbb::dmx::semantic_shutter_mapping *jdc_mode_mapping{find_shutter_mapping(jdc_open_mappings, "shutter_3")};
     require(jdc_mode_mapping != nullptr && jdc_mode_mapping->value == 0, "semantic shutter open resets StrobeModeStrobe to no effect");
     const bbb::dmx::semantic_shutter_mapping *jdc_mode_mapping_2{find_shutter_mapping(jdc_open_mappings, "shutter_6")};
     require(jdc_mode_mapping_2 != nullptr && jdc_mode_mapping_2->value == 0, "semantic shutter open resets second StrobeModeStrobe to no effect");
+
+    const bbb::dmx::semantic_shutter_mappings jdc_closed_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(jdc_strobe_mode, false)};
+    require(jdc_closed_mappings.ok, "semantic shutter close accepts GDTF strobe mode channels");
+    jdc_mode_mapping = find_shutter_mapping(jdc_closed_mappings, "shutter_3");
+    require(jdc_mode_mapping != nullptr && jdc_mode_mapping->value == 0, "semantic shutter close resets StrobeModeStrobe to no effect");
+    jdc_mode_mapping_2 = find_shutter_mapping(jdc_closed_mappings, "shutter_6");
+    require(jdc_mode_mapping_2 != nullptr && jdc_mode_mapping_2->value == 0, "semantic shutter close resets second StrobeModeStrobe to no effect");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";
