@@ -314,26 +314,28 @@ bangall
 - `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
 - `bangall` always outputs every known universe as `universe <id> <512 values...>` messages.
 
-#### Set fixture parameter
+#### Normalized fixture parameter
 
 ```max
-set spot_01 dimmer 255
-set spot_01 pan 32768
-set spot_01 tilt 32768
-set spot_01 pan_tilt 32768 32768
+set spot_01 dimmer 1.0
+set spot_01 pan 0.5
+set spot_01 tilt 0.5
+setall dimmer 1.0
 ```
 
-`set` first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message.
+`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. `setall` applies to every fixture in patch order. Unknown parameters are skipped for broad `setall` writes. `nset` and `nsetall` remain aliases for normalized writes.
 
-#### Normalized input
+#### Raw fixture parameter
 
 ```max
-nset spot_01 dimmer 1.0
-nset spot_01 pan 0.5
-nset spot_01 tilt 0.5
+rawset spot_01 dimmer 255
+rawset spot_01 pan 32768
+rawset spot_01 tilt 32768
+rawset spot_01 pan_tilt 32768 32768
+rawsetall dimmer 255
 ```
 
-`nset` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`.
+`rawset` writes raw fixture parameter values. It first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `rawsetall` is the broad raw write equivalent.
 
 #### Semantic color input
 
@@ -356,7 +358,7 @@ dimmer spot_01 1.0
 dimmerall 0.5
 ```
 
-`dimmer` and `dimmerall` express desired fixture intensity instead of a raw parameter name. For RGB/RGBW/CMY fixtures with a color-block dimmer, this writes the nearest preceding dimmer/intensity parameter for the color block. If no color-block dimmer exists, it falls back to the fixture's `dimmer` parameter, then the first dimmer/intensity-like parameter. Use raw `nset`/`nsetall` when you intentionally need a specific fixture parameter such as `dimmer_2` or a strobe/beam dimmer.
+`dimmer` and `dimmerall` express desired fixture intensity instead of a raw parameter name. For RGB/RGBW/CMY fixtures with a color-block dimmer, this writes the nearest preceding dimmer/intensity parameter for the color block. If no color-block dimmer exists, it falls back to the fixture's `dimmer` parameter, then the first dimmer/intensity-like parameter. Use exact `set`/`setall` normalized writes or `rawset`/`rawsetall` raw writes when you intentionally need a specific fixture parameter such as `dimmer_2` or a strobe/beam dimmer.
 
 #### Semantic shutter input
 
@@ -410,7 +412,7 @@ trackreset [spot_01]
 ptbytes spot_01 pan1 pan2 tilt1 tilt2
 ```
 
-`ptbytes` combines the incoming pan/tilt bytes using the target fixture profile's `byte_order`. There is no separate `set16` message in the current object; use `set spot_01 pan_tilt pan_u16 tilt_u16` for semantic 16-bit values.
+`ptbytes` combines the incoming pan/tilt bytes using the target fixture profile's `byte_order`. There is no separate `set16` message in the current object; use `rawset spot_01 pan_tilt pan_u16 tilt_u16` for explicit raw 16-bit values.
 
 ---
 
@@ -419,7 +421,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `color`, `colorall`, `dimmer`, `dimmerall`, `shutter`, `shutterall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `setall`, `rawset`, `rawsetall`, `nset`, `nsetall`, `color`, `colorall`, `dimmer`, `dimmerall`, `shutter`, `shutterall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.
