@@ -15,7 +15,7 @@ It outputs:
 
 - fully resolved `512`-integer DMX universe buffers, each value clamped to `0..255`. `bbb.dmx.fixturemap` can output either the selected universe as a bare 512-value list or all known universes as `universe <id> <512 values...>` messages.
 
-This is intentionally separate from `bbb.dmx.movertrack`. `movertrack` computes values. The mapper decides where those values land in a universe.
+This keeps `bbb.dmx.movertrack` as a low-level/test object, but `bbb.dmx.fixturemap` also owns fixture-aware tracking messages so larger patches can use loaded fixture positions, rotations, calibration, profile ranges, and universe mappings without one `movertrack` object per fixture.
 
 ---
 
@@ -280,6 +280,10 @@ Attributes implemented today:
 | `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
 | `@autobang` | bool | `1` | If non-zero, successful updates immediately output according to `@universe_mode`. |
 | `@universe_mode` | symbol | `selected` | Output mode for `bang` and autobang: `selected` or `all`. |
+| `@tracking_mode` | symbol | `smart` | Pan-continuity mode for fixture-aware tracking: `smart`, `pan`, or `off`. |
+| `@default_pan_range` | float | `540.` | Fallback pan range in degrees when a profile omits `pan.range_degrees`. |
+| `@default_tilt_range` | float | `270.` | Fallback tilt range in degrees when a profile omits `tilt.range_degrees`. |
+| `@track_strict` | bool | `0` | If non-zero, `trackall` errors on fixtures without pan/tilt instead of skipping them. |
 
 Outlets:
 
@@ -302,7 +306,7 @@ bangall
 
 - `read` loads a patch JSON path.
 - `reload` reloads the current patch.
-- `dump` reports current load status, selected universe, `universe_mode`, and known universe ids from the right outlet.
+- `dump` reports current load status, selected universe, `universe_mode`, tracking settings, and known universe ids from the right outlet.
 - `clear` clears loaded profiles, patch data, and universe buffers.
 - `reset` restores loaded fixture channels to profile defaults.
 - `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
@@ -338,31 +342,29 @@ channels 1 255 2 128 3 0
 
 Raw override is implemented for testing and emergency control. It should stay visibly separate from fixture parameters; otherwise patches become unreadable.
 
-#### Movertrack integration
+#### Fixture-aware mover tracking
 
-`bbb.dmx.movertrack` outputs:
+`bbb.dmx.fixturemap` supports direct tracking messages:
 
-```text
-pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2
+```max
+track spot_01 target_x target_y target_z
+trackall target_x target_y target_z
+trackrel spot_01 relative_x relative_y relative_z
+trackallrel relative_x relative_y relative_z
+trackreset [spot_01]
 ```
 
-The mapper currently accepts that tuple directly:
+`track` uses the loaded patch fixture `position`, `rotation`, and `calibration` values, plus the target fixture mode's semantic `pan` and `tilt` parameters. The pan/tilt ranges come from `parameters[].range_degrees`; missing ranges fall back to `@default_pan_range` and `@default_tilt_range`. The resulting 16-bit normalized pan/tilt values are written through the fixture profile, so `u8`, `u16`, and `u24` parameter widths keep their declared byte order.
+
+`trackall` applies the same world-space target to every mover in the patch. Non-mover fixtures are skipped by default; set `@track_strict 1` to turn those skips into errors. `trackrel` and `trackallrel` interpret the vector relative to each fixture origin. `trackreset` clears stored pan-continuity history used by `@tracking_mode smart|pan|off`.
+
+`bbb.dmx.movertrack` remains useful for small projects, tests, and hand-built Max patches. Its byte tuple can still be routed into fixturemap:
 
 ```max
 ptbytes spot_01 pan1 pan2 tilt1 tilt2
 ```
 
 `ptbytes` combines the incoming pan/tilt bytes using the target fixture profile's `byte_order`. There is no separate `set16` message in the current object; use `set spot_01 pan_tilt pan_u16 tilt_u16` for semantic 16-bit values.
-
-A typical patch is:
-
-```max
-[bbb.dmx.movertrack ...]
-|
-[prepend ptbytes spot_01]
-|
-[bbb.dmx.fixturemap @patch patches/show.json @universe 1]
-```
 
 ---
 
@@ -371,7 +373,7 @@ A typical patch is:
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.
