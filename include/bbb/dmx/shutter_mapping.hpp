@@ -146,6 +146,21 @@ inline bool shutter_range_is_no_effect(const fixture_parameter_range &range) {
         label == "none";
 }
 
+inline bool dimmer_min_text_matches(const std::string &text) {
+    return text == "min" ||
+        text == "minimum" ||
+        text == "zero";
+}
+
+inline bool dimmer_range_matches_closed(const fixture_parameter_range &range) {
+    if(shutter_range_matches_state(range, false)) {
+        return true;
+    }
+    const std::string function{normalized_semantic_key(range.function)};
+    const std::string label{normalized_semantic_key(range.label)};
+    return dimmer_min_text_matches(function) || dimmer_min_text_matches(label);
+}
+
 inline bool range_contains_value(const fixture_parameter_range &range, int value) {
     const int minimum{std::min(range.from, range.to)};
     const int maximum{std::max(range.from, range.to)};
@@ -242,6 +257,22 @@ inline const fixture_parameter_range *best_no_effect_range(const fixture_paramet
     return best_range;
 }
 
+inline const fixture_parameter_range *best_dimmer_closed_range(const fixture_parameter &parameter) {
+    const fixture_parameter_range *best_range{nullptr};
+    int best_score{-1};
+    for(const auto &range : parameter.ranges) {
+        if(!dimmer_range_matches_closed(range)) {
+            continue;
+        }
+        const int score{shutter_range_score(parameter, range)};
+        if(best_score < score) {
+            best_range = &range;
+            best_score = score;
+        }
+    }
+    return best_range;
+}
+
 inline bool semantic_shutter_mapping_contains_parameter(
     const std::vector<semantic_shutter_mapping> &mappings,
     const std::string &parameter_key
@@ -325,9 +356,11 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
             if(!dimmer_parameter_is_likely(mode, parameter)) {
                 continue;
             }
-            const fixture_parameter_range *range{best_shutter_range_for_state(parameter, false)};
+            const fixture_parameter_range *range{best_dimmer_closed_range(parameter)};
             if(range) {
                 append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
+            } else {
+                append_semantic_shutter_mapping(mappings, parameter.key, 0);
             }
         }
     }

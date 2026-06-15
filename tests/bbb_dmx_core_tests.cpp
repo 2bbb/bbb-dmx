@@ -102,6 +102,76 @@ bbb::dmx::fixture_mode make_semantic_shutter_mode(const std::string &parameter_k
     return mode;
 }
 
+bbb::dmx::fixture_mode make_sgm_q8_simplified_mode() {
+    bbb::dmx::fixture_mode mode{};
+    mode.key = "12.channel.simplified";
+    mode.footprint = 12;
+    mode.channels = {
+        make_labeled_u8_channel(1, "dimmer", "Dimmer"),
+        make_labeled_u8_channel(2, "shutter", "StrobeDuration"),
+        make_labeled_u8_channel(3, "shutter_2", "StrobeRate"),
+        make_labeled_u8_channel(4, "shutter_3", "Shutter1StrobeEffect"),
+        make_labeled_u8_channel(5, "red", "ColorAdd_R", 255),
+        make_labeled_u8_channel(6, "green", "ColorAdd_G", 255),
+        make_labeled_u8_channel(7, "blue", "ColorAdd_B", 255),
+        make_labeled_u8_channel(8, "white", "ColorAdd_W", 255),
+        make_labeled_u8_channel(9, "dimmer_2", "Dimmer"),
+        make_labeled_u8_channel(10, "shutter_4", "StrobeDuration"),
+        make_labeled_u8_channel(11, "shutter_5", "StrobeRate"),
+        make_labeled_u8_channel(12, "shutter_6", "Shutter2StrobeEffect")
+    };
+    bbb::dmx::fixture_parameter dimmer{make_u8_parameter("dimmer")};
+    dimmer.channels = {"dimmer"};
+    dimmer.ranges = {
+        make_parameter_range(0, 0, "min", "Min"),
+        make_parameter_range(1, 254, "dimmer", ""),
+        make_parameter_range(255, 255, "max", "Max")
+    };
+    bbb::dmx::fixture_parameter duration{make_u8_parameter("shutter")};
+    duration.channels = {"shutter"};
+    duration.ranges = {
+        make_parameter_range(0, 0, "strobe", "Short"),
+        make_parameter_range(1, 254, "strobe", ""),
+        make_parameter_range(255, 255, "strobe", "Long")
+    };
+    bbb::dmx::fixture_parameter rate{make_u8_parameter("shutter_2")};
+    rate.channels = {"shutter_2"};
+    rate.ranges = {
+        make_parameter_range(0, 0, "strobe", "Slow"),
+        make_parameter_range(1, 254, "strobe", ""),
+        make_parameter_range(255, 255, "strobe", "Fast")
+    };
+    bbb::dmx::fixture_parameter effect{make_u8_parameter("shutter_3")};
+    effect.channels = {"shutter_3"};
+    effect.ranges = {
+        make_parameter_range(0, 5, "strobe", "No Effect"),
+        make_parameter_range(6, 10, "strobe", "Flicker"),
+        make_parameter_range(251, 255, "strobe", "No Effect")
+    };
+    bbb::dmx::fixture_parameter dimmer_2{make_u8_parameter("dimmer_2")};
+    dimmer_2.channels = {"dimmer_2"};
+    dimmer_2.ranges = {
+        make_parameter_range(0, 0, "min", "Min"),
+        make_parameter_range(1, 254, "intensity", ""),
+        make_parameter_range(255, 255, "max", "Max")
+    };
+    bbb::dmx::fixture_parameter duration_2{make_u8_parameter("shutter_4")};
+    duration_2.channels = {"shutter_4"};
+    duration_2.ranges = duration.ranges;
+    bbb::dmx::fixture_parameter rate_2{make_u8_parameter("shutter_5")};
+    rate_2.channels = {"shutter_5"};
+    rate_2.ranges = rate.ranges;
+    bbb::dmx::fixture_parameter effect_2{make_u8_parameter("shutter_6")};
+    effect_2.channels = {"shutter_6"};
+    effect_2.ranges = {
+        make_parameter_range(0, 9, "strobe", "No Effect"),
+        make_parameter_range(10, 19, "random", "Random Pixel"),
+        make_parameter_range(251, 255, "strobe", "No Effect")
+    };
+    mode.parameters = {dimmer, duration, rate, effect, dimmer_2, duration_2, rate_2, effect_2};
+    return mode;
+}
+
 } // namespace
 
 int main() {
@@ -900,6 +970,31 @@ int main() {
     const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping_3{find_shutter_mapping(jdc_closed_mappings, "dimmer_3")};
     require(jdc_closed_dimmer_mapping_3 != nullptr && jdc_closed_dimmer_mapping_3->value == 0, "semantic shutter close falls back to third dimmer closed");
     require(find_shutter_mapping(jdc_open_mappings, "dimmer") == nullptr, "semantic shutter open does not force main dimmer open");
+
+    const bbb::dmx::fixture_mode sgm_q8_simplified_mode{make_sgm_q8_simplified_mode()};
+    const bbb::dmx::semantic_shutter_mappings sgm_q8_open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(sgm_q8_simplified_mode, true)};
+    require(sgm_q8_open_mappings.ok, "semantic shutter accepts SGM Q-8 simplified strobe channels");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_duration_mapping{find_shutter_mapping(sgm_q8_open_mappings, "shutter")};
+    require(sgm_q8_duration_mapping != nullptr && sgm_q8_duration_mapping->value == 0, "semantic shutter open resets SGM Q-8 StrobeDuration to default");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_rate_mapping{find_shutter_mapping(sgm_q8_open_mappings, "shutter_2")};
+    require(sgm_q8_rate_mapping != nullptr && sgm_q8_rate_mapping->value == 0, "semantic shutter open resets SGM Q-8 StrobeRate to default");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_effect_mapping{find_shutter_mapping(sgm_q8_open_mappings, "shutter_3")};
+    require(sgm_q8_effect_mapping != nullptr && sgm_q8_effect_mapping->value == 2, "semantic shutter open resets SGM Q-8 first strobe effect to no effect");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_duration_mapping_2{find_shutter_mapping(sgm_q8_open_mappings, "shutter_4")};
+    require(sgm_q8_duration_mapping_2 != nullptr && sgm_q8_duration_mapping_2->value == 0, "semantic shutter open resets SGM Q-8 second StrobeDuration to default");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_rate_mapping_2{find_shutter_mapping(sgm_q8_open_mappings, "shutter_5")};
+    require(sgm_q8_rate_mapping_2 != nullptr && sgm_q8_rate_mapping_2->value == 0, "semantic shutter open resets SGM Q-8 second StrobeRate to default");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_effect_mapping_2{find_shutter_mapping(sgm_q8_open_mappings, "shutter_6")};
+    require(sgm_q8_effect_mapping_2 != nullptr && sgm_q8_effect_mapping_2->value == 4, "semantic shutter open resets SGM Q-8 second strobe effect to no effect");
+    require(find_shutter_mapping(sgm_q8_open_mappings, "dimmer") == nullptr, "semantic shutter open does not force SGM Q-8 main dimmer open");
+    require(find_shutter_mapping(sgm_q8_open_mappings, "dimmer_2") == nullptr, "semantic shutter open does not force SGM Q-8 second dimmer open");
+
+    const bbb::dmx::semantic_shutter_mappings sgm_q8_closed_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(sgm_q8_simplified_mode, false)};
+    require(sgm_q8_closed_mappings.ok, "semantic shutter close accepts SGM Q-8 simplified strobe channels");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_closed_dimmer_mapping{find_shutter_mapping(sgm_q8_closed_mappings, "dimmer")};
+    require(sgm_q8_closed_dimmer_mapping != nullptr && sgm_q8_closed_dimmer_mapping->value == 0, "semantic shutter close falls back to SGM Q-8 main dimmer min");
+    const bbb::dmx::semantic_shutter_mapping *sgm_q8_closed_dimmer_mapping_2{find_shutter_mapping(sgm_q8_closed_mappings, "dimmer_2")};
+    require(sgm_q8_closed_dimmer_mapping_2 != nullptr && sgm_q8_closed_dimmer_mapping_2->value == 0, "semantic shutter close falls back to SGM Q-8 second dimmer min");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";
