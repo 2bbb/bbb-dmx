@@ -123,10 +123,14 @@ inline bool shutter_closed_text_matches(const std::string &text) {
 inline bool shutter_range_matches_state(const fixture_parameter_range &range, bool open) {
     const std::string function{normalized_semantic_key(range.function)};
     const std::string label{normalized_semantic_key(range.label)};
-    if(open) {
-        return shutter_open_text_matches(function) || shutter_open_text_matches(label);
+    const bool label_matches_open{shutter_open_text_matches(label)};
+    const bool label_matches_closed{shutter_closed_text_matches(label)};
+    if(label_matches_open || label_matches_closed) {
+        return open ? label_matches_open : label_matches_closed;
     }
-    return shutter_closed_text_matches(function) || shutter_closed_text_matches(label);
+    const bool function_matches_open{shutter_open_text_matches(function)};
+    const bool function_matches_closed{shutter_closed_text_matches(function)};
+    return open ? function_matches_open : function_matches_closed;
 }
 
 inline bool shutter_range_is_no_effect(const fixture_parameter_range &range) {

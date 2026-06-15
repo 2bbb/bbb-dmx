@@ -733,6 +733,18 @@ int main() {
     require(shutter_mapping.ok, "semantic shutter mapping accepts prefixed open labels");
     require(shutter_mapping.value == 47, "semantic shutter open prefers Shutter open before later Open range");
 
+    bbb::dmx::fixture_mode conflicting_shutter_label_mode{make_semantic_shutter_mode("shutter", "shutter")};
+    conflicting_shutter_label_mode.parameters[0].ranges = {
+        make_parameter_range(0, 31, "open", "Shutter closed"),
+        make_parameter_range(32, 63, "closed", "Shutter open")
+    };
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(conflicting_shutter_label_mode, false);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts conflicting function labels for closed state");
+    require(shutter_mapping.value == 15, "semantic shutter closed uses label over contradictory function");
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(conflicting_shutter_label_mode, true);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts conflicting function labels for open state");
+    require(shutter_mapping.value == 47, "semantic shutter open uses label over contradictory function");
+
     bbb::dmx::fixture_mode strobe_only_mode{make_semantic_shutter_mode("strobe", "shutter_strobe")};
     shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(strobe_only_mode, true);
     require(shutter_mapping.ok, "semantic shutter mapping accepts strobe-only shared channel ranges");
