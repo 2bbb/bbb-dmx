@@ -206,6 +206,64 @@ inline int color_range_center_value(const fixture_parameter_range &range) {
     return minimum + (maximum - minimum) / 2;
 }
 
+inline bool color_mix_priority_range_matches(const fixture_parameter &parameter, const fixture_parameter_range &range) {
+    const std::string parameter_key{normalized_color_key(parameter.key)};
+    const std::string descriptor{normalized_color_key(parameter.key + " " + range.function + " " + range.label)};
+    if(
+        parameter_key.find("colormixmode") == std::string::npos &&
+        parameter_key.find("colourmixmode") == std::string::npos &&
+        descriptor.find("colourchannels") == std::string::npos &&
+        descriptor.find("colorchannels") == std::string::npos
+    ) {
+        return false;
+    }
+    return descriptor.find("colourmixhaspriority") != std::string::npos ||
+        descriptor.find("colormixhaspriority") != std::string::npos ||
+        descriptor.find("colourmixinghaspriority") != std::string::npos ||
+        descriptor.find("colormixinghaspriority") != std::string::npos;
+}
+
+inline const fixture_parameter_range *best_color_mix_priority_range(const fixture_parameter &parameter) {
+    const fixture_parameter_range *best_range{nullptr};
+    int best_width{std::numeric_limits<int>::max()};
+    for(const auto &range : parameter.ranges) {
+        if(!color_mix_priority_range_matches(parameter, range)) {
+            continue;
+        }
+        const int width{std::abs(range.to - range.from)};
+        if(width < best_width) {
+            best_range = &range;
+            best_width = width;
+        }
+    }
+    return best_range;
+}
+
+inline const fixture_parameter *color_mix_priority_parameter_for_mode(const fixture_mode &mode, const fixture_parameter_range *&range) {
+    for(const auto &parameter : mode.parameters) {
+        const fixture_parameter_range *candidate_range{best_color_mix_priority_range(parameter)};
+        if(!candidate_range) {
+            continue;
+        }
+        range = candidate_range;
+        return &parameter;
+    }
+    range = nullptr;
+    return nullptr;
+}
+
+inline void append_color_mix_priority_parameter(const fixture_mode &mode, std::vector<std::pair<std::string, double>> &parameters) {
+    const fixture_parameter_range *range{nullptr};
+    const fixture_parameter *parameter{color_mix_priority_parameter_for_mode(mode, range)};
+    if(!parameter || !range) {
+        return;
+    }
+    parameters.push_back({
+        parameter->key,
+        (double)color_range_center_value(*range) / (double)color_parameter_max_value(*parameter)
+    });
+}
+
 inline double color_distance_squared(const semantic_color_request &left, const semantic_color_request &right) {
     const double red_delta{left.red - right.red};
     const double green_delta{left.green - right.green};
@@ -469,6 +527,7 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
         if(associated_dimmer) {
             parameters.push_back({associated_dimmer->key, intensity});
         }
+        append_color_mix_priority_parameter(mode, parameters);
         return semantic_color_mapping::success(parameters);
     }
 
@@ -485,6 +544,7 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
         if(associated_dimmer) {
             parameters.push_back({associated_dimmer->key, intensity});
         }
+        append_color_mix_priority_parameter(mode, parameters);
         return semantic_color_mapping::success(parameters);
     }
 

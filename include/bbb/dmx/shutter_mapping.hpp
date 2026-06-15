@@ -105,18 +105,28 @@ inline bool shutter_parameter_is_rate_or_duration_like(const fixture_mode &mode,
     });
 }
 
+inline bool shutter_open_text_matches(const std::string &text) {
+    return text == "open" ||
+        text == "shutteropen" ||
+        text == "shutteropened";
+}
+
+inline bool shutter_closed_text_matches(const std::string &text) {
+    return text == "closed" ||
+        text == "close" ||
+        text == "blackout" ||
+        text == "shutterclosed" ||
+        text == "shutterclose" ||
+        text == "shutterblackout";
+}
+
 inline bool shutter_range_matches_state(const fixture_parameter_range &range, bool open) {
     const std::string function{normalized_semantic_key(range.function)};
     const std::string label{normalized_semantic_key(range.label)};
     if(open) {
-        return function == "open" || label == "open";
+        return shutter_open_text_matches(function) || shutter_open_text_matches(label);
     }
-    return function == "closed" ||
-        function == "close" ||
-        function == "blackout" ||
-        label == "closed" ||
-        label == "close" ||
-        label == "blackout";
+    return shutter_closed_text_matches(function) || shutter_closed_text_matches(label);
 }
 
 inline bool shutter_range_is_no_effect(const fixture_parameter_range &range) {

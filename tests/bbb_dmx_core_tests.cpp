@@ -582,6 +582,23 @@ int main() {
     require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.75), "semantic RGBW disabled mode keeps full green");
     require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.25), "semantic RGBW disabled mode keeps full blue");
 
+    bbb::dmx::fixture_mode robe_color_mode{make_semantic_color_mode({"red", "green", "blue", "white", "colormixmode"})};
+    robe_color_mode.parameters.back().ranges = {
+        make_parameter_range(40, 49, "addition.mode.virtual.colour.mix", "Addition mode (Virtual + Colour mix)"),
+        make_parameter_range(255, 255, "colour.channels.colour.mix.has.priority", "Colour channels (Colour mix has priority)")
+    };
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        robe_color_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 0.0, 0.0)
+    );
+    require(color_mapping.ok, "semantic RGBW mapping accepts Robe-style color mix mode");
+    require(color_mapping.parameters.size() == 5, "semantic RGBW mapping writes color mix priority mode");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 1.0), "semantic RGBW color mix mode keeps requested red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 0.0), "semantic RGBW color mix mode clears green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 0.0), "semantic RGBW color mix mode clears blue");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "white"), 0.0), "semantic RGBW color mix mode clears white for saturated red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "colormixmode"), 1.0), "semantic RGBW mapping selects colour mix priority");
+
     bbb::dmx::fixture_mode cmy_mode{make_semantic_color_mode({"cyan", "magenta", "yellow"})};
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
         cmy_mode,
@@ -700,6 +717,21 @@ int main() {
     shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(shutter_mode, false);
     require(shutter_mapping.ok, "semantic shutter mapping accepts closed ranges");
     require(shutter_mapping.value == 15, "semantic shutter close uses center of closed range");
+
+    bbb::dmx::fixture_mode shutter_label_mode{make_semantic_shutter_mode("shutter", "shutter")};
+    shutter_label_mode.parameters[0].ranges = {
+        make_parameter_range(0, 31, "", "Shutter closed"),
+        make_parameter_range(32, 63, "", "Shutter open"),
+        make_parameter_range(64, 91, "", "Slow to fast 1/10"),
+        make_parameter_range(92, 95, "", "Slow to fast 10/10"),
+        make_parameter_range(96, 127, "", "Open")
+    };
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(shutter_label_mode, false);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts prefixed closed labels");
+    require(shutter_mapping.value == 15, "semantic shutter close uses Shutter closed range");
+    shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(shutter_label_mode, true);
+    require(shutter_mapping.ok, "semantic shutter mapping accepts prefixed open labels");
+    require(shutter_mapping.value == 47, "semantic shutter open prefers Shutter open before later Open range");
 
     bbb::dmx::fixture_mode strobe_only_mode{make_semantic_shutter_mode("strobe", "shutter_strobe")};
     shutter_mapping = bbb::dmx::semantic_shutter_parameter_for_mode(strobe_only_mode, true);
