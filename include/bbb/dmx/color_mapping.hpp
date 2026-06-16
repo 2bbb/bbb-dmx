@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "bbb/dmx/fixture_profile.hpp"
+#include "bbb/dmx/semantic_overrides.hpp"
 
 namespace bbb::dmx {
 
@@ -56,6 +57,18 @@ inline semantic_color_request make_semantic_color_request(double red, double gre
     };
 }
 
+inline std::string normalized_color_key(const std::string &text) {
+    std::string result;
+    result.reserve(text.size());
+    for(const char character : text) {
+        const unsigned char unsigned_character{(unsigned char)character};
+        if(std::isalnum(unsigned_character)) {
+            result.push_back((char)std::tolower(unsigned_character));
+        }
+    }
+    return result;
+}
+
 inline bool mode_has_semantic_parameter(const fixture_mode &mode, const char *parameter) {
     return mode.find_parameter(parameter) != nullptr;
 }
@@ -85,6 +98,32 @@ inline bool color_parameter_is_dimmer_like(const fixture_parameter &parameter) {
         normalized.find("intensity") != std::string::npos;
 }
 
+inline bool color_parameter_ranges_indicate_intensity(const fixture_parameter &parameter) {
+    if(parameter.ranges.empty()) {
+        return true;
+    }
+    for(const auto &range : parameter.ranges) {
+        const std::string descriptor{normalized_color_key(range.function + " " + range.label)};
+        if(
+            descriptor == "dimmer" ||
+            descriptor == "intensity" ||
+            descriptor == "min" ||
+            descriptor == "max" ||
+            descriptor == "open" ||
+            descriptor == "closed" ||
+            descriptor.find("dimmer") != std::string::npos ||
+            descriptor.find("intensity") != std::string::npos
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool color_parameter_is_intensity_dimmer_like(const fixture_parameter &parameter) {
+    return color_parameter_is_dimmer_like(parameter) && color_parameter_ranges_indicate_intensity(parameter);
+}
+
 inline const fixture_parameter *associated_color_dimmer_parameter(
     const fixture_mode &mode,
     const std::vector<std::string> &color_parameter_keys
@@ -110,7 +149,7 @@ inline const fixture_parameter *associated_color_dimmer_parameter(
     const fixture_parameter *best_parameter{nullptr};
     int best_offset{-1};
     for(const auto &parameter : mode.parameters) {
-        if(!color_parameter_is_dimmer_like(parameter)) {
+        if(!color_parameter_is_intensity_dimmer_like(parameter)) {
             continue;
         }
         const int offset{color_parameter_first_offset(mode, parameter)};
@@ -136,20 +175,161 @@ inline double color_component_for_associated_dimmer(double component, double int
     return std::max(0.0, std::min(1.0, component / intensity));
 }
 
-inline const fixture_parameter *first_dimmer_parameter(const fixture_mode &mode) {
+inline const fixture_parameter *first_intensity_dimmer_parameter(const fixture_mode &mode) {
     if(const fixture_parameter *parameter = mode.find_parameter("dimmer")) {
-        return parameter;
+        if(color_parameter_is_intensity_dimmer_like(*parameter)) {
+            return parameter;
+        }
     }
     for(const auto &parameter : mode.parameters) {
-        if(color_parameter_is_dimmer_like(parameter)) {
+        if(color_parameter_is_intensity_dimmer_like(parameter)) {
             return &parameter;
         }
     }
     return nullptr;
 }
 
-inline semantic_color_mapping semantic_intensity_parameters_for_mode(const fixture_mode &mode, double intensity) {
+inline void append_semantic_color_parameter(
+    std::vector<std::pair<std::string, double>> &parameters,
+    const std::string &parameter_key,
+    double value
+) {
+    for(auto &parameter : parameters) {
+        if(parameter.first == parameter_key) {
+            parameter.second = value;
+            return;
+        }
+    }
+    parameters.push_back({parameter_key, value});
+}
+
+inline semantic_color_mapping semantic_intensity_parameters_from_override(
+    const fixture_semantic_mode_override &mode_override,
+    double intensity
+) {
+    if(mode_override.intensity_parameters.empty()) {
+        return semantic_color_mapping::failure("semantic override has no intensity parameters");
+    }
+
     const double clamped_intensity{clamp_normalized_color(intensity)};
+    std::vector<std::pair<std::string, double>> parameters{};
+    for(const auto &parameter_key : mode_override.intensity_parameters) {
+        append_semantic_color_parameter(parameters, parameter_key, clamped_intensity);
+    }
+    return semantic_color_mapping::success(parameters);
+}
+
+inline bool color_parameter_key_has_component_suffix(
+    const std::string &parameter_key,
+    const std::string &component,
+    std::string &suffix
+) {
+    if(parameter_key == component) {
+        suffix = "";
+        return true;
+    }
+    const std::string prefix{component + "_"};
+    if(parameter_key.find(prefix) == 0) {
+        suffix = parameter_key.substr(component.size());
+        return true;
+    }
+    return false;
+}
+
+struct rgb_color_block {
+public:
+    std::string red{};
+    std::string green{};
+    std::string blue{};
+    std::string white{};
+};
+
+inline std::vector<rgb_color_block> rgb_color_blocks_for_mode(const fixture_mode &mode) {
+    std::vector<rgb_color_block> blocks{};
+    for(const auto &parameter : mode.parameters) {
+        std::string suffix{};
+        if(!color_parameter_key_has_component_suffix(parameter.key, "red", suffix)) {
+            continue;
+        }
+        const std::string green_key{"green" + suffix};
+        const std::string blue_key{"blue" + suffix};
+        if(!mode.find_parameter(green_key) || !mode.find_parameter(blue_key)) {
+            continue;
+        }
+        const std::string white_key{"white" + suffix};
+        blocks.push_back(rgb_color_block{
+            parameter.key,
+            green_key,
+            blue_key,
+            mode.find_parameter(white_key) ? white_key : ""
+        });
+    }
+    return blocks;
+}
+
+struct cmy_color_block {
+public:
+    std::string cyan{};
+    std::string magenta{};
+    std::string yellow{};
+};
+
+inline std::vector<cmy_color_block> cmy_color_blocks_for_mode(const fixture_mode &mode) {
+    std::vector<cmy_color_block> blocks{};
+    for(const auto &parameter : mode.parameters) {
+        std::string suffix{};
+        if(!color_parameter_key_has_component_suffix(parameter.key, "cyan", suffix)) {
+            continue;
+        }
+        const std::string magenta_key{"magenta" + suffix};
+        const std::string yellow_key{"yellow" + suffix};
+        if(!mode.find_parameter(magenta_key) || !mode.find_parameter(yellow_key)) {
+            continue;
+        }
+        blocks.push_back(cmy_color_block{parameter.key, magenta_key, yellow_key});
+    }
+    return blocks;
+}
+
+inline semantic_color_mapping semantic_intensity_parameters_for_mode(
+    const fixture_mode &mode,
+    double intensity,
+    const fixture_semantic_mode_override *mode_override = nullptr
+) {
+    if(mode_override && !mode_override->intensity_parameters.empty()) {
+        return semantic_intensity_parameters_from_override(*mode_override, intensity);
+    }
+
+    const double clamped_intensity{clamp_normalized_color(intensity)};
+    std::vector<std::pair<std::string, double>> parameters{};
+    for(const auto &parameter : mode.parameters) {
+        if(!color_parameter_is_intensity_dimmer_like(parameter)) {
+            continue;
+        }
+        append_semantic_color_parameter(parameters, parameter.key, clamped_intensity);
+    }
+    if(!parameters.empty()) {
+        return semantic_color_mapping::success(parameters);
+    }
+
+    return semantic_color_mapping::failure("fixture has no semantic intensity parameter");
+}
+
+inline semantic_color_mapping semantic_primary_intensity_parameter_for_mode(
+    const fixture_mode &mode,
+    double intensity,
+    const fixture_semantic_mode_override *mode_override = nullptr
+) {
+    const double clamped_intensity{clamp_normalized_color(intensity)};
+
+    if(mode_override) {
+        if(!mode_override->primary_intensity_parameter.empty()) {
+            return semantic_color_mapping::success({{mode_override->primary_intensity_parameter, clamped_intensity}});
+        }
+        if(!mode_override->intensity_parameters.empty()) {
+            return semantic_color_mapping::success({{mode_override->intensity_parameters.front(), clamped_intensity}});
+        }
+    }
 
     if(
         mode_has_semantic_parameter(mode, "red") &&
@@ -171,23 +351,11 @@ inline semantic_color_mapping semantic_intensity_parameters_for_mode(const fixtu
         }
     }
 
-    if(const fixture_parameter *parameter = first_dimmer_parameter(mode)) {
+    if(const fixture_parameter *parameter = first_intensity_dimmer_parameter(mode)) {
         return semantic_color_mapping::success({{parameter->key, clamped_intensity}});
     }
 
     return semantic_color_mapping::failure("fixture has no semantic intensity parameter");
-}
-
-inline std::string normalized_color_key(const std::string &text) {
-    std::string result;
-    result.reserve(text.size());
-    for(const char character : text) {
-        const unsigned char unsigned_character{(unsigned char)character};
-        if(std::isalnum(unsigned_character)) {
-            result.push_back((char)std::tolower(unsigned_character));
-        }
-    }
-    return result;
 }
 
 inline int color_parameter_max_value(const fixture_parameter &parameter) {
@@ -262,6 +430,84 @@ inline void append_color_mix_priority_parameter(const fixture_mode &mode, std::v
         parameter->key,
         (double)color_range_center_value(*range) / (double)color_parameter_max_value(*parameter)
     });
+}
+
+inline void append_semantic_rgb_block_parameters(
+    std::vector<std::pair<std::string, double>> &parameters,
+    const std::string &red_parameter,
+    const std::string &green_parameter,
+    const std::string &blue_parameter,
+    const std::string &white_parameter,
+    const std::string &dimmer_parameter,
+    const semantic_color_request &color,
+    const semantic_color_options &options
+) {
+    const double intensity{!dimmer_parameter.empty() ? color_request_intensity(color) : 1.0};
+    if(!white_parameter.empty() && options.use_white) {
+        const double white{std::min(color.red, std::min(color.green, color.blue))};
+        append_semantic_color_parameter(parameters, red_parameter, color_component_for_associated_dimmer(color.red - white, intensity));
+        append_semantic_color_parameter(parameters, green_parameter, color_component_for_associated_dimmer(color.green - white, intensity));
+        append_semantic_color_parameter(parameters, blue_parameter, color_component_for_associated_dimmer(color.blue - white, intensity));
+        append_semantic_color_parameter(parameters, white_parameter, color_component_for_associated_dimmer(white, intensity));
+    } else {
+        append_semantic_color_parameter(parameters, red_parameter, color_component_for_associated_dimmer(color.red, intensity));
+        append_semantic_color_parameter(parameters, green_parameter, color_component_for_associated_dimmer(color.green, intensity));
+        append_semantic_color_parameter(parameters, blue_parameter, color_component_for_associated_dimmer(color.blue, intensity));
+    }
+    if(!dimmer_parameter.empty()) {
+        append_semantic_color_parameter(parameters, dimmer_parameter, intensity);
+    }
+}
+
+inline void append_semantic_cmy_block_parameters(
+    std::vector<std::pair<std::string, double>> &parameters,
+    const std::string &cyan_parameter,
+    const std::string &magenta_parameter,
+    const std::string &yellow_parameter,
+    const std::string &dimmer_parameter,
+    const semantic_color_request &color
+) {
+    const double intensity{!dimmer_parameter.empty() ? color_request_intensity(color) : 1.0};
+    append_semantic_color_parameter(parameters, cyan_parameter, 1.0 - color_component_for_associated_dimmer(color.red, intensity));
+    append_semantic_color_parameter(parameters, magenta_parameter, 1.0 - color_component_for_associated_dimmer(color.green, intensity));
+    append_semantic_color_parameter(parameters, yellow_parameter, 1.0 - color_component_for_associated_dimmer(color.blue, intensity));
+    if(!dimmer_parameter.empty()) {
+        append_semantic_color_parameter(parameters, dimmer_parameter, intensity);
+    }
+}
+
+inline semantic_color_mapping semantic_color_parameters_from_override(
+    const fixture_semantic_mode_override &mode_override,
+    const semantic_color_request &color,
+    const semantic_color_options &options
+) {
+    std::vector<std::pair<std::string, double>> parameters{};
+    for(const auto &block : mode_override.rgb_blocks) {
+        append_semantic_rgb_block_parameters(
+            parameters,
+            block.red,
+            block.green,
+            block.blue,
+            block.white,
+            block.dimmer,
+            color,
+            options
+        );
+    }
+    for(const auto &block : mode_override.cmy_blocks) {
+        append_semantic_cmy_block_parameters(
+            parameters,
+            block.cyan,
+            block.magenta,
+            block.yellow,
+            block.dimmer,
+            color
+        );
+    }
+    if(parameters.empty()) {
+        return semantic_color_mapping::failure("semantic override has no color blocks");
+    }
+    return semantic_color_mapping::success(parameters);
 }
 
 inline double color_distance_squared(const semantic_color_request &left, const semantic_color_request &right) {
@@ -502,49 +748,52 @@ inline semantic_color_mapping semantic_color_parameters_for_mode(
     const fixture_mode &mode,
     const semantic_color_request &color,
     const semantic_color_options &options = {},
-    const std::vector<std::pair<std::string, int>> &current_parameter_values = {}
+    const std::vector<std::pair<std::string, int>> &current_parameter_values = {},
+    const fixture_semantic_mode_override *mode_override = nullptr
 ) {
     std::vector<std::pair<std::string, double>> parameters;
     const semantic_color_request clamped_color{make_semantic_color_request(color.red, color.green, color.blue)};
 
-    if(
-        mode_has_semantic_parameter(mode, "red") &&
-        mode_has_semantic_parameter(mode, "green") &&
-        mode_has_semantic_parameter(mode, "blue")
-    ) {
-        const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, {"red", "green", "blue", "white"})};
-        const double intensity{associated_dimmer ? color_request_intensity(clamped_color) : 1.0};
-        const bool has_white{mode_has_semantic_parameter(mode, "white")};
-        if(has_white && options.use_white) {
-            const double white{std::min(clamped_color.red, std::min(clamped_color.green, clamped_color.blue))};
-            parameters.push_back({"red", color_component_for_associated_dimmer(clamped_color.red - white, intensity)});
-            parameters.push_back({"green", color_component_for_associated_dimmer(clamped_color.green - white, intensity)});
-            parameters.push_back({"blue", color_component_for_associated_dimmer(clamped_color.blue - white, intensity)});
-            parameters.push_back({"white", color_component_for_associated_dimmer(white, intensity)});
-        } else {
-            parameters.push_back({"red", color_component_for_associated_dimmer(clamped_color.red, intensity)});
-            parameters.push_back({"green", color_component_for_associated_dimmer(clamped_color.green, intensity)});
-            parameters.push_back({"blue", color_component_for_associated_dimmer(clamped_color.blue, intensity)});
-        }
-        if(associated_dimmer) {
-            parameters.push_back({associated_dimmer->key, intensity});
+    if(mode_override && (!mode_override->rgb_blocks.empty() || !mode_override->cmy_blocks.empty())) {
+        return semantic_color_parameters_from_override(*mode_override, clamped_color, options);
+    }
+
+    const std::vector<rgb_color_block> rgb_blocks{rgb_color_blocks_for_mode(mode)};
+    if(!rgb_blocks.empty()) {
+        for(const auto &block : rgb_blocks) {
+            std::vector<std::string> block_parameters{block.red, block.green, block.blue};
+            if(!block.white.empty()) {
+                block_parameters.push_back(block.white);
+            }
+            const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, block_parameters)};
+            append_semantic_rgb_block_parameters(
+                parameters,
+                block.red,
+                block.green,
+                block.blue,
+                block.white,
+                associated_dimmer ? associated_dimmer->key : "",
+                clamped_color,
+                options
+            );
         }
         append_color_mix_priority_parameter(mode, parameters);
         return semantic_color_mapping::success(parameters);
     }
 
-    if(
-        mode_has_semantic_parameter(mode, "cyan") &&
-        mode_has_semantic_parameter(mode, "magenta") &&
-        mode_has_semantic_parameter(mode, "yellow")
-    ) {
-        const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, {"cyan", "magenta", "yellow"})};
-        const double intensity{associated_dimmer ? color_request_intensity(clamped_color) : 1.0};
-        parameters.push_back({"cyan", 1.0 - color_component_for_associated_dimmer(clamped_color.red, intensity)});
-        parameters.push_back({"magenta", 1.0 - color_component_for_associated_dimmer(clamped_color.green, intensity)});
-        parameters.push_back({"yellow", 1.0 - color_component_for_associated_dimmer(clamped_color.blue, intensity)});
-        if(associated_dimmer) {
-            parameters.push_back({associated_dimmer->key, intensity});
+    const std::vector<cmy_color_block> cmy_blocks{cmy_color_blocks_for_mode(mode)};
+    if(!cmy_blocks.empty()) {
+        for(const auto &block : cmy_blocks) {
+            const std::vector<std::string> block_parameters{block.cyan, block.magenta, block.yellow};
+            const fixture_parameter *associated_dimmer{associated_color_dimmer_parameter(mode, block_parameters)};
+            append_semantic_cmy_block_parameters(
+                parameters,
+                block.cyan,
+                block.magenta,
+                block.yellow,
+                associated_dimmer ? associated_dimmer->key : "",
+                clamped_color
+            );
         }
         append_color_mix_priority_parameter(mode, parameters);
         return semantic_color_mapping::success(parameters);

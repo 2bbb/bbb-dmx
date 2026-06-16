@@ -190,7 +190,11 @@ inline int shutter_parameter_base_score(const fixture_parameter &parameter) {
     return 0;
 }
 
-inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open);
+inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(
+    const fixture_mode &mode,
+    bool open,
+    const fixture_semantic_mode_override *mode_override = nullptr
+);
 
 inline int shutter_range_score(const fixture_parameter &parameter, const fixture_parameter_range &range) {
     const int minimum{std::min(range.from, range.to)};
@@ -270,8 +274,12 @@ inline bool shutter_parameter_should_reset_to_no_effect(const fixture_mode &mode
         best_no_effect_range(parameter) != nullptr;
 }
 
-inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixture_mode &mode, bool open) {
-    const semantic_shutter_mappings mappings{semantic_shutter_parameters_for_mode(mode, open)};
+inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(
+    const fixture_mode &mode,
+    bool open,
+    const fixture_semantic_mode_override *mode_override = nullptr
+) {
+    const semantic_shutter_mappings mappings{semantic_shutter_parameters_for_mode(mode, open, mode_override)};
     if(!mappings.ok) {
         return semantic_shutter_mapping::failure(mappings.message);
     }
@@ -281,7 +289,11 @@ inline semantic_shutter_mapping semantic_shutter_parameter_for_mode(const fixtur
     return mappings.mappings.front();
 }
 
-inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open) {
+inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(
+    const fixture_mode &mode,
+    bool open,
+    const fixture_semantic_mode_override *mode_override
+) {
     const fixture_parameter *best_parameter{nullptr};
     int best_score{-1};
     std::vector<semantic_shutter_mapping> mappings{};
@@ -317,7 +329,7 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
     }
 
     if(!open && !has_explicit_shutter_state_mapping) {
-        const semantic_color_mapping intensity_mapping{semantic_intensity_parameters_for_mode(mode, 0.0)};
+        const semantic_color_mapping intensity_mapping{semantic_primary_intensity_parameter_for_mode(mode, 0.0, mode_override)};
         if(intensity_mapping.ok) {
             for(const auto &parameter : intensity_mapping.parameters) {
                 append_semantic_shutter_mapping(mappings, parameter.first, 0);

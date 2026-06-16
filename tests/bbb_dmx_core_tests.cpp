@@ -622,10 +622,108 @@ int main() {
     require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer_2"), 0.75), "semantic RGB mapping opens nearest color dimmer instead of earlier strobe dimmer");
     require(find_semantic_parameter(color_mapping, "dimmer") == nullptr, "semantic RGB mapping does not open earlier strobe dimmer");
     bbb::dmx::semantic_color_mapping intensity_mapping{bbb::dmx::semantic_intensity_parameters_for_mode(jdc_color_mode, 0.4)};
-    require(intensity_mapping.ok, "semantic intensity accepts RGB fixture with associated dimmer");
-    require(intensity_mapping.parameters.size() == 1, "semantic intensity writes one master-like dimmer");
-    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer_2"), 0.4), "semantic intensity maps to nearest color dimmer");
-    require(find_semantic_parameter(intensity_mapping, "dimmer") == nullptr, "semantic intensity does not open earlier strobe dimmer");
+    require(intensity_mapping.ok, "semantic intensity accepts RGB fixture with associated dimmers");
+    require(intensity_mapping.parameters.size() == 2, "semantic intensity writes all intensity dimmers");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer"), 0.4), "semantic intensity maps earlier master dimmer");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer_2"), 0.4), "semantic intensity maps nearest color dimmer");
+
+    bbb::dmx::fixture_mode jdc_multi_color_mode{make_semantic_color_mode({"dimmer", "shutter", "shutter_2", "shutter_3", "dimmer_2", "red", "green", "blue", "dimmer_3", "red_2", "green_2", "blue_2"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        jdc_multi_color_mode,
+        bbb::dmx::make_semantic_color_request(0.25, 0.5, 0.75)
+    );
+    require(color_mapping.ok, "semantic RGB mapping accepts multi-block RGB fixture");
+    require(color_mapping.parameters.size() == 8, "semantic RGB mapping writes both RGB blocks plus associated dimmers");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red"), 1.0 / 3.0), "semantic RGB mapping normalizes first red block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green"), 2.0 / 3.0), "semantic RGB mapping normalizes first green block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue"), 1.0), "semantic RGB mapping normalizes first blue block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "red_2"), 1.0 / 3.0), "semantic RGB mapping normalizes second red block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "green_2"), 2.0 / 3.0), "semantic RGB mapping normalizes second green block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "blue_2"), 1.0), "semantic RGB mapping normalizes second blue block");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer_2"), 0.75), "semantic RGB mapping opens first associated color dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer_3"), 0.75), "semantic RGB mapping opens second associated color dimmer");
+    require(find_semantic_parameter(color_mapping, "dimmer") == nullptr, "semantic RGB mapping still does not open earlier master dimmer");
+
+    intensity_mapping = bbb::dmx::semantic_intensity_parameters_for_mode(jdc_multi_color_mode, 0.4);
+    require(intensity_mapping.ok, "semantic intensity accepts multi-dimmer fixture");
+    require(intensity_mapping.parameters.size() == 3, "semantic intensity writes all JDC dimmers");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer"), 0.4), "semantic intensity maps JDC master dimmer");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer_2"), 0.4), "semantic intensity maps JDC first color dimmer");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer_3"), 0.4), "semantic intensity maps JDC second color dimmer");
+
+    bbb::dmx::fixture_semantic_overrides semantic_overrides{};
+    bbb::dmx::mapper_result overrides_result{bbb::dmx::parse_fixture_semantic_overrides_text(R"json({
+        "schema": "bbb.dmx.semantic_overrides.v1",
+        "profiles": {
+            "test.profile": {
+                "modes": {
+                    "weird.mode": {
+                        "aliases": {
+                            "plate_dimmer": "plate_i"
+                        },
+                        "intensity": {
+                            "primary": "master",
+                            "parameters": ["master", "plate_i", "beam_i"]
+                        },
+                        "color": {
+                            "rgb": [
+                                {"red": "plate_r", "green": "plate_g", "blue": "plate_b", "dimmer": "plate_i"},
+                                {"red": "beam_r", "green": "beam_g", "blue": "beam_b", "dimmer": "beam_i"}
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    })json", semantic_overrides)};
+    require(overrides_result.ok, "semantic overrides JSON parses");
+    const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_overrides.find_mode_override("test.profile", "weird.mode")};
+    require(mode_override != nullptr, "semantic overrides find profile/mode");
+    require(mode_override->resolve_alias("plate_dimmer") == "plate_i", "semantic overrides resolve parameter alias");
+    require(mode_override->resolve_alias("unknown") == "unknown", "semantic overrides leave unknown aliases unchanged");
+
+    bbb::dmx::fixture_mode weird_color_mode{make_semantic_color_mode({"master", "plate_r", "plate_g", "plate_b", "plate_i", "beam_r", "beam_g", "beam_b", "beam_i"})};
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        nullptr,
+        weird_color_mode,
+        bbb::dmx::make_semantic_color_request(0.2, 0.4, 0.8),
+        bbb::dmx::semantic_color_options{true, false},
+        {},
+        mode_override
+    );
+    require(color_mapping.ok, "semantic overrides map custom RGB blocks");
+    require(color_mapping.parameters.size() == 8, "semantic overrides write two RGB blocks and dimmers");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "plate_r"), 0.25), "semantic overrides normalize first custom red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "plate_g"), 0.5), "semantic overrides normalize first custom green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "plate_b"), 1.0), "semantic overrides normalize first custom blue");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "plate_i"), 0.8), "semantic overrides open first custom dimmer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "beam_r"), 0.25), "semantic overrides normalize second custom red");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "beam_g"), 0.5), "semantic overrides normalize second custom green");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "beam_b"), 1.0), "semantic overrides normalize second custom blue");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "beam_i"), 0.8), "semantic overrides open second custom dimmer");
+    require(find_semantic_parameter(color_mapping, "master") == nullptr, "semantic overrides color does not implicitly open master dimmer");
+
+    intensity_mapping = bbb::dmx::semantic_intensity_parameters_for_mode(weird_color_mode, 0.6, mode_override);
+    require(intensity_mapping.ok, "semantic overrides map explicit intensity parameters");
+    require(intensity_mapping.parameters.size() == 3, "semantic overrides write explicit intensity list");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "master"), 0.6), "semantic overrides map master intensity");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "plate_i"), 0.6), "semantic overrides map plate intensity");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "beam_i"), 0.6), "semantic overrides map beam intensity");
+    bbb::dmx::semantic_color_mapping primary_intensity_mapping{bbb::dmx::semantic_primary_intensity_parameter_for_mode(weird_color_mode, 0.7, mode_override)};
+    require(primary_intensity_mapping.ok, "semantic overrides map primary intensity");
+    require(primary_intensity_mapping.parameters.size() == 1, "semantic overrides primary intensity writes one parameter");
+    require(nearly_equal(*find_semantic_parameter(primary_intensity_mapping, "master"), 0.7), "semantic overrides use explicit primary intensity");
+
+    bbb::dmx::fixture_mode dimmer_curve_mode{make_semantic_color_mode({"dimmer", "dimmer_2"})};
+    dimmer_curve_mode.parameters[1].ranges = {
+        make_parameter_range(0, 4, "smooth.gamma.corrected", "Smooth Gamma Corrected"),
+        make_parameter_range(60, 255, "reserved", "Reserved")
+    };
+    intensity_mapping = bbb::dmx::semantic_intensity_parameters_for_mode(dimmer_curve_mode, 0.4);
+    require(intensity_mapping.ok, "semantic intensity accepts dimmer fixture with dimmer curve channel");
+    require(intensity_mapping.parameters.size() == 1, "semantic intensity skips non-intensity dimmer curve parameter");
+    require(nearly_equal(*find_semantic_parameter(intensity_mapping, "dimmer"), 0.4), "semantic intensity keeps real dimmer with dimmer curve present");
+    require(find_semantic_parameter(intensity_mapping, "dimmer_2") == nullptr, "semantic intensity does not write dimmer curve parameter");
 
     bbb::dmx::fixture_mode rgbw_mode{make_semantic_color_mode({"red", "green", "blue", "white"})};
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
