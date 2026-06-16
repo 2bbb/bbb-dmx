@@ -390,16 +390,18 @@ inline bool wheel_slot_to_rgb(const fixture_wheel_slot &slot, semantic_color_req
     return false;
 }
 
+inline bool color_wheel_id_is_likely(const std::string &text) {
+    const std::string normalized{normalized_color_key(text)};
+    return normalized.find("colorwheel") != std::string::npos ||
+        normalized.find("colourwheel") != std::string::npos;
+}
+
 inline bool parameter_is_likely_color_wheel(const fixture_parameter &parameter) {
-    const std::string normalized{normalized_color_key(parameter.key)};
-    if(normalized.find("colorwheel") != std::string::npos || normalized.find("colourwheel") != std::string::npos) {
-        return true;
-    }
-    if(!parameter.wheel.empty()) {
+    if(color_wheel_id_is_likely(parameter.key) || color_wheel_id_is_likely(parameter.wheel)) {
         return true;
     }
     for(const auto &range : parameter.ranges) {
-        if(range.has_wheel_slot || !range.wheel.empty()) {
+        if(color_wheel_id_is_likely(range.wheel)) {
             return true;
         }
     }

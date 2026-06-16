@@ -721,7 +721,30 @@ int main() {
     wheel_parameter.ranges[2].wheel_slot = 3;
     wheel_parameter.ranges[3].has_wheel_slot = true;
     wheel_parameter.ranges[3].wheel_slot = 1;
-    wheel_mode.parameters = {wheel_parameter, make_u8_parameter("dimmer")};
+    bbb::dmx::fixture_parameter gobo_parameter{make_u8_parameter("gobo")};
+    gobo_parameter.type = bbb::dmx::fixture_parameter_type::enum_u8;
+    gobo_parameter.channels = {"gobo"};
+    gobo_parameter.wheel = "GoboWheel1";
+    gobo_parameter.ranges = {
+        make_parameter_range(0, 9, "open", "Open"),
+        make_parameter_range(10, 19, "gobo.1", "Gobo 1")
+    };
+    gobo_parameter.ranges[0].has_wheel_slot = true;
+    gobo_parameter.ranges[0].wheel_slot = 1;
+    bbb::dmx::fixture_parameter prism_parameter{make_u8_parameter("prism")};
+    prism_parameter.type = bbb::dmx::fixture_parameter_type::enum_u8;
+    prism_parameter.channels = {"prism"};
+    prism_parameter.wheel = "PrismWheel1";
+    prism_parameter.ranges = {
+        make_parameter_range(0, 19, "open", "Open position"),
+        make_parameter_range(20, 49, "prism.1", "Prism 1")
+    };
+    prism_parameter.ranges[0].has_wheel_slot = true;
+    prism_parameter.ranges[0].wheel_slot = 1;
+    wheel_mode.channels.push_back(make_u8_channel(3, "gobo"));
+    wheel_mode.channels.push_back(make_u8_channel(4, "prism"));
+    wheel_mode.footprint = 4;
+    wheel_mode.parameters = {wheel_parameter, gobo_parameter, prism_parameter, make_u8_parameter("dimmer")};
     wheel_profile.wheels = {color_wheel};
     wheel_profile.modes = {wheel_mode};
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
@@ -768,6 +791,17 @@ int main() {
     );
     require(color_mapping.ok, "semantic color wheel fallback maps white with current value");
     require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 104.0 / 255.0), "semantic color wheel fallback uses nearest equal open range");
+    color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+        &wheel_profile,
+        wheel_mode,
+        bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0),
+        bbb::dmx::semantic_color_options{true, true},
+        {{"gobo", 5}, {"prism", 9}}
+    );
+    require(color_mapping.ok, "semantic color wheel fallback ignores non-color wheels");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 4.0 / 255.0), "semantic color wheel fallback keeps color wheel open when gobo or prism is nearer");
+    require(find_semantic_parameter(color_mapping, "gobo") == nullptr, "semantic color wheel fallback does not write gobo wheels");
+    require(find_semantic_parameter(color_mapping, "prism") == nullptr, "semantic color wheel fallback does not write prism wheels");
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
         &wheel_profile,
         wheel_mode,
