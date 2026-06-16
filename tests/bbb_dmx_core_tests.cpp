@@ -888,16 +888,19 @@ int main() {
 
     bbb::dmx::fixture_mode jdc_strobe_mode{};
     jdc_strobe_mode.key = "jdc";
-    jdc_strobe_mode.footprint = 11;
+    jdc_strobe_mode.footprint = 20;
     jdc_strobe_mode.channels = {
         make_labeled_u8_channel(3, "dimmer", "Dimmer"),
         make_labeled_u8_channel(4, "shutter", "StrobeDuration"),
         make_labeled_u8_channel(5, "shutter_2", "StrobeRate", 255),
         make_labeled_u8_channel(6, "shutter_3", "StrobeModeStrobe"),
         make_labeled_u8_channel(8, "dimmer_2", "Dimmer"),
-        make_labeled_u8_channel(9, "shutter_4", "StrobeDuration"),
-        make_labeled_u8_channel(10, "shutter_5", "StrobeRate", 255),
-        make_labeled_u8_channel(11, "shutter_6", "StrobeModeStrobe"),
+        make_labeled_u8_channel(9, "red", "ColorAdd_R", 255),
+        make_labeled_u8_channel(10, "green", "ColorAdd_G", 255),
+        make_labeled_u8_channel(11, "blue", "ColorAdd_B", 255),
+        make_labeled_u8_channel(12, "shutter_4", "StrobeDuration"),
+        make_labeled_u8_channel(13, "shutter_5", "StrobeRate", 255),
+        make_labeled_u8_channel(14, "shutter_6", "StrobeModeStrobe"),
         make_labeled_u8_channel(20, "dimmer_3", "Dimmer")
     };
     bbb::dmx::fixture_parameter jdc_dimmer{make_u8_parameter("dimmer")};
@@ -924,6 +927,12 @@ int main() {
     bbb::dmx::fixture_parameter jdc_dimmer_2{make_u8_parameter("dimmer_2")};
     jdc_dimmer_2.channels = {"dimmer_2"};
     jdc_dimmer_2.ranges = jdc_dimmer.ranges;
+    bbb::dmx::fixture_parameter jdc_red{make_u8_parameter("red")};
+    jdc_red.channels = {"red"};
+    bbb::dmx::fixture_parameter jdc_green{make_u8_parameter("green")};
+    jdc_green.channels = {"green"};
+    bbb::dmx::fixture_parameter jdc_blue{make_u8_parameter("blue")};
+    jdc_blue.channels = {"blue"};
     bbb::dmx::fixture_parameter jdc_duration_2{make_u8_parameter("shutter_4")};
     jdc_duration_2.channels = {"shutter_4"};
     jdc_duration_2.ranges = {make_parameter_range(0, 255, "strobe", "Duration")};
@@ -941,7 +950,7 @@ int main() {
     bbb::dmx::fixture_parameter jdc_dimmer_3{make_u8_parameter("dimmer_3")};
     jdc_dimmer_3.channels = {"dimmer_3"};
     jdc_dimmer_3.ranges = jdc_dimmer.ranges;
-    jdc_strobe_mode.parameters = {jdc_dimmer, jdc_duration, jdc_rate, jdc_mode, jdc_dimmer_2, jdc_duration_2, jdc_rate_2, jdc_mode_2, jdc_dimmer_3};
+    jdc_strobe_mode.parameters = {jdc_dimmer, jdc_duration, jdc_rate, jdc_mode, jdc_dimmer_2, jdc_red, jdc_green, jdc_blue, jdc_duration_2, jdc_rate_2, jdc_mode_2, jdc_dimmer_3};
     const bbb::dmx::semantic_shutter_mappings jdc_open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(jdc_strobe_mode, true)};
     require(jdc_open_mappings.ok, "semantic shutter accepts GDTF strobe mode channels");
     const bbb::dmx::semantic_shutter_mapping *jdc_duration_mapping{find_shutter_mapping(jdc_open_mappings, "shutter")};
@@ -963,12 +972,10 @@ int main() {
     require(jdc_mode_mapping != nullptr && jdc_mode_mapping->value == 0, "semantic shutter close resets StrobeModeStrobe to no effect");
     jdc_mode_mapping_2 = find_shutter_mapping(jdc_closed_mappings, "shutter_6");
     require(jdc_mode_mapping_2 != nullptr && jdc_mode_mapping_2->value == 0, "semantic shutter close resets second StrobeModeStrobe to no effect");
-    const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping{find_shutter_mapping(jdc_closed_mappings, "dimmer")};
-    require(jdc_closed_dimmer_mapping != nullptr && jdc_closed_dimmer_mapping->value == 0, "semantic shutter close falls back to main dimmer closed");
+    require(find_shutter_mapping(jdc_closed_mappings, "dimmer") == nullptr, "semantic shutter close does not zero JDC strobe master dimmer");
     const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping_2{find_shutter_mapping(jdc_closed_mappings, "dimmer_2")};
-    require(jdc_closed_dimmer_mapping_2 != nullptr && jdc_closed_dimmer_mapping_2->value == 0, "semantic shutter close falls back to second dimmer closed");
-    const bbb::dmx::semantic_shutter_mapping *jdc_closed_dimmer_mapping_3{find_shutter_mapping(jdc_closed_mappings, "dimmer_3")};
-    require(jdc_closed_dimmer_mapping_3 != nullptr && jdc_closed_dimmer_mapping_3->value == 0, "semantic shutter close falls back to third dimmer closed");
+    require(jdc_closed_dimmer_mapping_2 != nullptr && jdc_closed_dimmer_mapping_2->value == 0, "semantic shutter close falls back to JDC semantic color dimmer only");
+    require(find_shutter_mapping(jdc_closed_mappings, "dimmer_3") == nullptr, "semantic shutter close does not zero JDC pixel dimmers");
     require(find_shutter_mapping(jdc_open_mappings, "dimmer") == nullptr, "semantic shutter open does not force main dimmer open");
 
     const bbb::dmx::fixture_mode sgm_q8_simplified_mode{make_sgm_q8_simplified_mode()};
@@ -992,9 +999,8 @@ int main() {
     const bbb::dmx::semantic_shutter_mappings sgm_q8_closed_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(sgm_q8_simplified_mode, false)};
     require(sgm_q8_closed_mappings.ok, "semantic shutter close accepts SGM Q-8 simplified strobe channels");
     const bbb::dmx::semantic_shutter_mapping *sgm_q8_closed_dimmer_mapping{find_shutter_mapping(sgm_q8_closed_mappings, "dimmer")};
-    require(sgm_q8_closed_dimmer_mapping != nullptr && sgm_q8_closed_dimmer_mapping->value == 0, "semantic shutter close falls back to SGM Q-8 main dimmer min");
-    const bbb::dmx::semantic_shutter_mapping *sgm_q8_closed_dimmer_mapping_2{find_shutter_mapping(sgm_q8_closed_mappings, "dimmer_2")};
-    require(sgm_q8_closed_dimmer_mapping_2 != nullptr && sgm_q8_closed_dimmer_mapping_2->value == 0, "semantic shutter close falls back to SGM Q-8 second dimmer min");
+    require(sgm_q8_closed_dimmer_mapping != nullptr && sgm_q8_closed_dimmer_mapping->value == 0, "semantic shutter close falls back to SGM Q-8 semantic color dimmer");
+    require(find_shutter_mapping(sgm_q8_closed_mappings, "dimmer_2") == nullptr, "semantic shutter close does not zero unrelated SGM Q-8 dimmer");
 
     bbb::dmx::fixture_profile rgbw_profile{};
     rgbw_profile.key = "test.rgbw";

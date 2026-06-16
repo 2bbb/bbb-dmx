@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "bbb/dmx/color_mapping.hpp"
 #include "bbb/dmx/fixture_profile.hpp"
 
 namespace bbb::dmx {
@@ -146,21 +147,6 @@ inline bool shutter_range_is_no_effect(const fixture_parameter_range &range) {
         label == "none";
 }
 
-inline bool dimmer_min_text_matches(const std::string &text) {
-    return text == "min" ||
-        text == "minimum" ||
-        text == "zero";
-}
-
-inline bool dimmer_range_matches_closed(const fixture_parameter_range &range) {
-    if(shutter_range_matches_state(range, false)) {
-        return true;
-    }
-    const std::string function{normalized_semantic_key(range.function)};
-    const std::string label{normalized_semantic_key(range.label)};
-    return dimmer_min_text_matches(function) || dimmer_min_text_matches(label);
-}
-
 inline bool range_contains_value(const fixture_parameter_range &range, int value) {
     const int minimum{std::min(range.from, range.to)};
     const int maximum{std::max(range.from, range.to)};
@@ -204,11 +190,6 @@ inline int shutter_parameter_base_score(const fixture_parameter &parameter) {
     return 0;
 }
 
-inline bool dimmer_parameter_is_likely(const fixture_mode &mode, const fixture_parameter &parameter) {
-    const std::string descriptor{shutter_parameter_descriptor(mode, parameter)};
-    return normalized_contains_any(descriptor, {"dimmer", "intensity"});
-}
-
 inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixture_mode &mode, bool open);
 
 inline int shutter_range_score(const fixture_parameter &parameter, const fixture_parameter_range &range) {
@@ -246,22 +227,6 @@ inline const fixture_parameter_range *best_no_effect_range(const fixture_paramet
     int best_score{-1};
     for(const auto &range : parameter.ranges) {
         if(!shutter_range_is_no_effect(range)) {
-            continue;
-        }
-        const int score{shutter_range_score(parameter, range)};
-        if(best_score < score) {
-            best_range = &range;
-            best_score = score;
-        }
-    }
-    return best_range;
-}
-
-inline const fixture_parameter_range *best_dimmer_closed_range(const fixture_parameter &parameter) {
-    const fixture_parameter_range *best_range{nullptr};
-    int best_score{-1};
-    for(const auto &range : parameter.ranges) {
-        if(!dimmer_range_matches_closed(range)) {
             continue;
         }
         const int score{shutter_range_score(parameter, range)};
@@ -352,15 +317,10 @@ inline semantic_shutter_mappings semantic_shutter_parameters_for_mode(const fixt
     }
 
     if(!open && !has_explicit_shutter_state_mapping) {
-        for(const auto &parameter : mode.parameters) {
-            if(!dimmer_parameter_is_likely(mode, parameter)) {
-                continue;
-            }
-            const fixture_parameter_range *range{best_dimmer_closed_range(parameter)};
-            if(range) {
-                append_semantic_shutter_mapping(mappings, parameter.key, range_center_value(*range));
-            } else {
-                append_semantic_shutter_mapping(mappings, parameter.key, 0);
+        const semantic_color_mapping intensity_mapping{semantic_intensity_parameters_for_mode(mode, 0.0)};
+        if(intensity_mapping.ok) {
+            for(const auto &parameter : intensity_mapping.parameters) {
+                append_semantic_shutter_mapping(mappings, parameter.first, 0);
             }
         }
     }

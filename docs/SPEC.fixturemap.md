@@ -376,7 +376,7 @@ Resolution order is deliberately simple and deterministic:
 1. On likely shutter/strobe parameters, prefer range metadata whose `function` or `label` is `open` for opening, or `closed`/`close`/`blackout` for closing. Write the midpoint of the matching range.
 2. For GDTF-style split strobe fixtures, parameters whose channel label identifies `StrobeMode...` are reset to a `No effect` / `No function` range if present for both open and close. `StrobeDuration`, `StrobeRate`, `StrobeFrequency`, and `StrobeSpeed` parameters are reset to their profile defaults instead of being treated as open fallbacks.
 3. Prefer parameters named like `shutter`, then `shutter-strobe`, then other names containing `shutter`, then names containing `strobe`.
-4. If closing and no explicit shutter closed/blackout range exists, write any dimmer/intensity parameters with a closed or minimum range to closed.
+4. If closing and no explicit shutter closed/blackout range exists, set the fixture's semantic intensity target to zero. Do not zero every dimmer-like parameter; multi-cell fixtures may use later dimmers as pixel/segment gates.
 5. If no matching range exists but a likely non-rate/non-duration shutter/strobe parameter exists, write max (`255`, `65535`, or `16777215`) for open and `0` for close.
 
 If shutter and strobe share the same channel, the semantic shutter write intentionally overwrites that channel. Fixtures with multiple shutter/strobe mode channels may receive multiple writes for one semantic shutter command. `shutterall` skips fixtures without a supported shutter/strobe parameter; per-fixture `shutter` reports an error for unsupported fixtures.
