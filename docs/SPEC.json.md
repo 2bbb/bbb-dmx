@@ -396,7 +396,8 @@ Top-level must contain at least one of `fixtures`, `grid`, or `grids`.
 
 | Field | Type | Required | Meaning |
 |---|---:|---:|---|
-| `id` | string | yes | Fixture id from the patch. |
+| `id` | string | conditional | Fixture id from the patch. Mutually exclusive with `group`; exactly one is required. |
+| `group` | string | conditional | Loaded fixture group id. Mutually exclusive with `id`; exactly one is required. |
 | `sample` | object | yes | Matrix sample region. |
 | `params` | object | yes | Parameter-to-source bindings. |
 
@@ -404,7 +405,7 @@ Top-level must contain at least one of `fixtures`, `grid`, or `grids`.
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
-| `mode` | string | no | `point` for explicit fixtures, `average` for grid | `point`, `average`, `max`, or `min`. |
+| `mode` | string | no | `point` for explicit fixtures, `average` for grid | `point` or `average`. |
 | `x` | number | yes | — | Normalized X sample center, clamped to `0..1`. |
 | `y` | number | yes | — | Normalized Y sample center, clamped to `0..1`. |
 | `w` | number | no | `0` | Normalized width for region modes, clamped to `0..1`. |
@@ -425,14 +426,14 @@ Top-level must contain at least one of `fixtures`, `grid`, or `grids`.
 
 ### 4.6 Parameter source bindings
 
-`params` maps fixture parameter names to either a source string or numeric constant.
+`params` maps fixture parameter names to either a source string or numeric constant. In `bbb.dmx.matrixmap`, a complete `red`/`green`/`blue` triplet is treated as a semantic RGB color request; other params are direct normalized writes after semantic override alias resolution.
 
 | Source | Meaning |
 |---|---|
-| `r` | Red matrix plane. |
-| `g` | Green matrix plane. |
-| `b` | Blue matrix plane. |
-| `a` | Alpha matrix plane. |
+| `r`, `red` | Red matrix plane. |
+| `g`, `green` | Green matrix plane. |
+| `b`, `blue` | Blue matrix plane. |
+| `a`, `alpha` | Alpha matrix plane. |
 | `luma` | Luminance derived from RGB. |
 | `maxrgb` | Max of RGB. |
 | `constant:N` | Constant value. `N <= 1.0` is normalized; `N > 1.0` is legacy byte-style and converted with `N / 255`. |

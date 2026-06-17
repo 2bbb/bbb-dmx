@@ -76,6 +76,7 @@ public:
 struct fixture_mapping {
 public:
     std::string fixture_id{};
+    std::string group_id{};
     sample_region sample{};
     std::vector<parameter_binding> parameters{};
 };
@@ -392,12 +393,21 @@ inline bbb::dmx::mapper_result parse_fixture_mapping(const bbb::dmx::json_value 
         return bbb::dmx::mapper_result::failure("fixture mapping must be object");
     }
     std::string error{};
-    if(!bbb::dmx::json_string(object, "id", mapping.fixture_id, true, error)) {
+    bbb::dmx::json_string(object, "id", mapping.fixture_id, false, error);
+    if(!error.empty()) {
         return bbb::dmx::mapper_result::failure(error);
     }
+    bbb::dmx::json_string(object, "group", mapping.group_id, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    if(mapping.fixture_id.empty() == mapping.group_id.empty()) {
+        return bbb::dmx::mapper_result::failure("fixture mapping requires exactly one of id or group");
+    }
+    const std::string target_id{!mapping.fixture_id.empty() ? mapping.fixture_id : mapping.group_id};
     const bbb::dmx::json_value *sample{object.find("sample")};
     if(!sample) {
-        return bbb::dmx::mapper_result::failure("fixture mapping requires sample: " + mapping.fixture_id);
+        return bbb::dmx::mapper_result::failure("fixture mapping requires sample: " + target_id);
     }
     bbb::dmx::mapper_result result{parse_sample_region(*sample, mapping.sample)};
     if(!result.ok) {
@@ -405,7 +415,7 @@ inline bbb::dmx::mapper_result parse_fixture_mapping(const bbb::dmx::json_value 
     }
     const bbb::dmx::json_value *params{object.find("params")};
     if(!params) {
-        return bbb::dmx::mapper_result::failure("fixture mapping requires params: " + mapping.fixture_id);
+        return bbb::dmx::mapper_result::failure("fixture mapping requires params: " + target_id);
     }
     return parse_parameter_bindings(*params, mapping.parameters);
 }

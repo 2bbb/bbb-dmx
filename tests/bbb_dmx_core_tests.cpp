@@ -9,6 +9,7 @@
 #include "bbb/dmx/common.hpp"
 #include "bbb/dmx/curve.hpp"
 #include "bbb/dmx/mask.hpp"
+#include "bbb/dmx/matrix_map.hpp"
 #include "bbb/dmx/movertrack.hpp"
 #include "bbb/dmx/pattern.hpp"
 
@@ -596,6 +597,36 @@ int main() {
     map_result = json_mapper.set_normalized("12", "dimmer", 0.5);
     require(map_result.ok, "fixture JSON mapper normalized set");
     require(json_mapper.universe(1).channel(25) == 128, "fixture JSON mapper normalized dimmer");
+
+
+    bbb::dmx::matrixmap::matrix_map_config matrix_map{};
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "fixtures": [
+            {
+                "group": "front",
+                "sample": { "x": 0.5, "y": 0.25, "mode": "point" },
+                "params": { "red": "r", "green": "g", "blue": "b" }
+            }
+        ]
+    })json", matrix_map);
+    require(map_result.ok, "matrixmap group fixture mapping parses");
+    require(matrix_map.fixtures.size() == 1, "matrixmap group fixture mapping count");
+    require(matrix_map.fixtures[0].fixture_id.empty(), "matrixmap group fixture mapping has no fixture id");
+    require(matrix_map.fixtures[0].group_id == "front", "matrixmap group fixture mapping stores group id");
+    require(matrix_map.fixtures[0].parameters.size() == 3, "matrixmap group fixture mapping stores RGB params");
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "fixtures": [
+            {
+                "id": "fixture_01",
+                "group": "front",
+                "sample": { "x": 0.5, "y": 0.25 },
+                "params": { "red": "r" }
+            }
+        ]
+    })json", matrix_map);
+    require(!map_result.ok, "matrixmap fixture mapping rejects id and group together");
 
 
     bbb::dmx::fixture_mode rgb_mode{make_semantic_color_mode({"red", "green", "blue"})};

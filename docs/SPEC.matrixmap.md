@@ -23,7 +23,9 @@ Input:
 - `jit_matrix <name>` — read one Jitter matrix by registered name and patch sampled values into fixture parameters.
 - `readpatch <path>` — load fixture patch JSON.
 - `readmap <path>` — load matrix map JSON.
-- `reload` — reload current patch and map files.
+- `readgroups <path>` — load optional fixture groups JSON for explicit group mappings.
+- `readoverrides <path>` — load optional semantic overrides JSON for aliases and semantic color mapping.
+- `reload` — reload current patch, map, groups, and semantic overrides files.
 - `bang` — output current DMX buffers without re-sampling.
 - `dump` — output load status.
 
@@ -31,6 +33,10 @@ Attributes:
 
 - `@patch <path>` — fixture patch JSON.
 - `@map <path>` — matrix map JSON.
+- `@group` / `@groups <path>` — optional fixture groups JSON.
+- `@semantic_overrides <path>` — optional semantic overrides JSON.
+- `@color_use_white 0|1` — RGBW semantic matrix color behavior.
+- `@color_wheel_fallback 0|1` — allow semantic matrix color to choose nearest color wheel slot when no RGB/CMY model exists.
 - `@universe <id>` — selected universe when `@universe_mode selected`.
 - `@universe_mode all|selected|changed` — output all patched universes, one selected universe, or only universes whose full frame changed since the last output.
 - `@plane_order rgba|argb|bgra|gray` — plane layout of incoming `char` or `float32` matrices.
@@ -44,6 +50,8 @@ Input value policy:
 - `char` matrices are interpreted as byte values and normalized with `byte / 255.0`.
 - `float32` matrices are interpreted directly as normalized values and clamped to `0.0..1.0`.
 - The normalized sample is written through the fixture parameter type: `u8` => `0..255`, `u16` => `0..65535`, `u24` => `0..16777215`.
+- If a mapping contains all three `red`, `green`, and `blue` params, those bindings are treated as one semantic RGB color request. The mapper uses loaded semantic overrides first, then built-in RGB/RGBW/CMY heuristics, then optional color-wheel fallback. The three direct raw writes are skipped when semantic mapping succeeds.
+- Other params are direct normalized fixture parameter writes after semantic override alias resolution.
 - `@gamma` and `@brightness` operate in normalized space before the value is expanded to the fixture bit depth.
 
 Limitations:
@@ -99,11 +107,27 @@ Fields:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `id` | string | Fixture id in the loaded patch. |
+| `id` | string | Fixture id in the loaded patch. Mutually exclusive with `group`. |
+| `group` | string | Loaded fixture group id. Mutually exclusive with `id`; the same sample and params are applied to every resolved fixture in patch order. |
 | `sample.x`, `sample.y` | number | Normalized matrix coordinates, `0..1`. |
 | `sample.mode` | `point` or `average` | Single-pixel lookup or rectangular average. |
 | `sample.w`, `sample.h` | number | Normalized average region size. Only used by `average`. |
 | `params` | object | Fixture parameter name to color source mapping. |
+
+
+Group targets are explicit selections loaded through `@group` / `@groups`:
+
+```json
+{
+  "fixtures": [
+    {
+      "group": "glp_glp_jdc_1",
+      "sample": { "x": 0.5, "y": 0.5, "mode": "average", "w": 1.0, "h": 1.0 },
+      "params": { "red": "r", "green": "g", "blue": "b" }
+    }
+  ]
+}
+```
 
 ### 3.2 Grid mapping
 

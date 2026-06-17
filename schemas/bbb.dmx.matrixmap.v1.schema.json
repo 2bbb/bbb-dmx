@@ -17,7 +17,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "id",
           "sample",
           "params"
         ],
@@ -37,9 +36,7 @@
               "mode": {
                 "enum": [
                   "point",
-                  "average",
-                  "max",
-                  "min"
+                  "average"
                 ]
               },
               "x": {
@@ -75,9 +72,13 @@
                     {
                       "enum": [
                         "r",
+                        "red",
                         "g",
+                        "green",
                         "b",
+                        "blue",
                         "a",
+                        "alpha",
                         "luma",
                         "maxrgb"
                       ]
@@ -92,8 +93,24 @@
                 }
               ]
             }
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "group"
+            ]
+          }
+        ]
       },
       "minItems": 1
     },
@@ -126,9 +143,7 @@
         "mode": {
           "enum": [
             "point",
-            "average",
-            "max",
-            "min"
+            "average"
           ]
         },
         "params": {
@@ -142,9 +157,13 @@
                   {
                     "enum": [
                       "r",
+                      "red",
                       "g",
+                      "green",
                       "b",
+                      "blue",
                       "a",
+                      "alpha",
                       "luma",
                       "maxrgb"
                     ]
@@ -193,9 +212,7 @@
           "mode": {
             "enum": [
               "point",
-              "average",
-              "max",
-              "min"
+              "average"
             ]
           },
           "params": {
@@ -209,9 +226,13 @@
                     {
                       "enum": [
                         "r",
+                        "red",
                         "g",
+                        "green",
                         "b",
+                        "blue",
                         "a",
+                        "alpha",
                         "luma",
                         "maxrgb"
                       ]
@@ -241,7 +262,6 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "id",
               "sample",
               "params"
             ],
@@ -261,9 +281,7 @@
                   "mode": {
                     "enum": [
                       "point",
-                      "average",
-                      "max",
-                      "min"
+                      "average"
                     ]
                   },
                   "x": {
@@ -299,9 +317,13 @@
                         {
                           "enum": [
                             "r",
+                            "red",
                             "g",
+                            "green",
                             "b",
+                            "blue",
                             "a",
+                            "alpha",
                             "luma",
                             "maxrgb"
                           ]
@@ -316,8 +338,24 @@
                     }
                   ]
                 }
+              },
+              "group": {
+                "type": "string",
+                "minLength": 1
               }
-            }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "id"
+                ]
+              },
+              {
+                "required": [
+                  "group"
+                ]
+              }
+            ]
           },
           "minItems": 1
         }
@@ -357,9 +395,7 @@
             "mode": {
               "enum": [
                 "point",
-                "average",
-                "max",
-                "min"
+                "average"
               ]
             },
             "params": {
@@ -373,9 +409,13 @@
                       {
                         "enum": [
                           "r",
+                          "red",
                           "g",
+                          "green",
                           "b",
+                          "blue",
                           "a",
+                          "alpha",
                           "luma",
                           "maxrgb"
                         ]
@@ -431,9 +471,7 @@
               "mode": {
                 "enum": [
                   "point",
-                  "average",
-                  "max",
-                  "min"
+                  "average"
                 ]
               },
               "params": {
@@ -447,9 +485,13 @@
                         {
                           "enum": [
                             "r",
+                            "red",
                             "g",
+                            "green",
                             "b",
+                            "blue",
                             "a",
+                            "alpha",
                             "luma",
                             "maxrgb"
                           ]
