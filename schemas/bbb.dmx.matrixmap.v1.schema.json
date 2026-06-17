@@ -103,12 +103,18 @@
           {
             "required": [
               "id"
-            ]
+            ],
+            "properties": {
+              "id": {}
+            }
           },
           {
             "required": [
               "group"
-            ]
+            ],
+            "properties": {
+              "group": {}
+            }
           }
         ]
       },
@@ -404,12 +410,18 @@
               {
                 "required": [
                   "id"
-                ]
+                ],
+                "properties": {
+                  "id": {}
+                }
               },
               {
                 "required": [
                   "group"
-                ]
+                ],
+                "properties": {
+                  "group": {}
+                }
               }
             ]
           },
