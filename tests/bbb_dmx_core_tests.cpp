@@ -695,6 +695,27 @@ int main() {
     })json", matrix_map);
     require(!map_result.ok, "matrixmap grid rejects reversed bounds");
 
+    std::vector<float> float32_rgb_noise(100 * 100 * 3, 0.0f);
+    const long sample_x{50};
+    const long sample_y{50};
+    const std::size_t sample_index{(std::size_t)((sample_y * 100 + sample_x) * 3)};
+    float32_rgb_noise[sample_index + 0] = 0.25f;
+    float32_rgb_noise[sample_index + 1] = 0.5f;
+    float32_rgb_noise[sample_index + 2] = 0.75f;
+    bbb::dmx::matrixmap::matrix_read_view float32_rgb_view{};
+    float32_rgb_view.data = (const char *)float32_rgb_noise.data();
+    float32_rgb_view.width = 100;
+    float32_rgb_view.height = 100;
+    float32_rgb_view.plane_count = 3;
+    float32_rgb_view.stride_x = 3 * (long)sizeof(float);
+    float32_rgb_view.stride_y = 100 * float32_rgb_view.stride_x;
+    float32_rgb_view.plane_order = bbb::dmx::matrixmap::plane_order_kind::rgba;
+    float32_rgb_view.value_kind = bbb::dmx::matrixmap::matrix_value_kind::float32;
+    const bbb::dmx::matrixmap::color_value sampled_float32_rgb{bbb::dmx::matrixmap::sample_point(float32_rgb_view, 0.5, 0.5)};
+    require(nearly_equal(sampled_float32_rgb.red, 0.25), "matrixmap samples float32 three-plane red");
+    require(nearly_equal(sampled_float32_rgb.green, 0.5), "matrixmap samples float32 three-plane green");
+    require(nearly_equal(sampled_float32_rgb.blue, 0.75), "matrixmap samples float32 three-plane blue");
+    require(nearly_equal(sampled_float32_rgb.alpha, 1.0), "matrixmap float32 three-plane alpha defaults to one");
 
     bbb::dmx::fixture_mode rgb_mode{make_semantic_color_mode({"red", "green", "blue"})};
     bbb::dmx::semantic_color_mapping color_mapping{bbb::dmx::semantic_color_parameters_for_mode(
