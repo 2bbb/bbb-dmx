@@ -71,7 +71,12 @@ Top-level file:
     "start_index": 1,
     "cols": 2,
     "rows": 2,
+    "x0": 0.0,
+    "y0": 0.0,
+    "x1": 1.0,
+    "y1": 1.0,
     "mode": "average",
+    "placement": "cell",
     "params": {
       "red": "r",
       "green": "g",
@@ -140,7 +145,12 @@ Grid mapping is for LED/pixel arrays where fixture ids follow a predictable sequ
     "start_index": 1,
     "cols": 16,
     "rows": 8,
+    "x0": 0.1,
+    "y0": 0.2,
+    "x1": 0.9,
+    "y1": 0.8,
     "mode": "average",
+    "placement": "cell",
     "params": { "red": "r", "green": "g", "blue": "b" }
   }
 }
@@ -151,7 +161,30 @@ Rules:
 - `fixture_pattern` is a `printf`-style integer format string. Example: `pixel_%03d` expands to `pixel_001`.
 - Fixture order is row-major: left-to-right, top-to-bottom.
 - `cols` and `rows` must be positive.
-- The generated cell center becomes `sample.x/y`; the cell size becomes `sample.w/h`.
+- `x0`, `y0`, `x1`, and `y1` are optional normalized bounds. Defaults are full matrix bounds: `0, 0, 1, 1`. Runtime rejects reversed bounds.
+- `placement` controls how generated sample coordinates are placed:
+  - `cell` (default; alias `cells`) splits the bounded rectangle into `cols * rows` cells. The cell center becomes `sample.x/y`; the cell size becomes `sample.w/h`.
+  - `points` (alias `intersections`) places fixtures on the bounded grid intersections, including both endpoints. `cols` and `rows` are still fixture counts. A one-column or one-row axis samples the center of that bounded axis. Point placement sets `sample.w/h` to `0`, so use `mode: "point"` unless you explicitly want point-like fallback behavior.
+
+Point-placement example:
+
+```json
+{
+  "grid": {
+    "fixture_pattern": "point_%02d",
+    "start_index": 1,
+    "cols": 4,
+    "rows": 3,
+    "x0": 0.2,
+    "y0": 0.1,
+    "x1": 0.8,
+    "y1": 0.9,
+    "mode": "point",
+    "placement": "points",
+    "params": { "red": "r", "green": "g", "blue": "b" }
+  }
+}
+```
 
 ### 3.3 Color sources
 

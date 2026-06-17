@@ -16,6 +16,11 @@ enum class sample_mode {
     average,
 };
 
+enum class grid_placement {
+    cell,
+    points,
+};
+
 enum class color_source_kind {
     red,
     green,
@@ -122,6 +127,18 @@ inline bool parse_sample_mode(const std::string &text, sample_mode &mode) {
     }
     if(text == "average") {
         mode = sample_mode::average;
+        return true;
+    }
+    return false;
+}
+
+inline bool parse_grid_placement(const std::string &text, grid_placement &placement) {
+    if(text == "cell" || text == "cells") {
+        placement = grid_placement::cell;
+        return true;
+    }
+    if(text == "points" || text == "intersections") {
+        placement = grid_placement::points;
         return true;
     }
     return false;
@@ -445,6 +462,41 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
     if(!parse_sample_mode(mode_text, mode)) {
         return bbb::dmx::mapper_result::failure("unknown grid sample mode: " + mode_text);
     }
+    std::string placement_text{"cell"};
+    bbb::dmx::json_string(object, "placement", placement_text, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    grid_placement placement{grid_placement::cell};
+    if(!parse_grid_placement(placement_text, placement)) {
+        return bbb::dmx::mapper_result::failure("unknown grid placement: " + placement_text);
+    }
+    double x0{0.0};
+    double y0{0.0};
+    double x1{1.0};
+    double y1{1.0};
+    bbb::dmx::json_double(object, "x0", x0, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    bbb::dmx::json_double(object, "y0", y0, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    bbb::dmx::json_double(object, "x1", x1, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    bbb::dmx::json_double(object, "y1", y1, false, error);
+    if(!error.empty()) {
+        return bbb::dmx::mapper_result::failure(error);
+    }
+    if(x0 < 0.0 || 1.0 < x0 || y0 < 0.0 || 1.0 < y0 || x1 < 0.0 || 1.0 < x1 || y1 < 0.0 || 1.0 < y1) {
+        return bbb::dmx::mapper_result::failure("grid bounds must be normalized 0..1");
+    }
+    if(x1 < x0 || y1 < y0) {
+        return bbb::dmx::mapper_result::failure("grid bounds require x0 <= x1 and y0 <= y1");
+    }
     const bbb::dmx::json_value *params{object.find("params")};
     if(!params) {
         return bbb::dmx::mapper_result::failure("grid requires params");
@@ -457,8 +509,10 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
     if(cols <= 0 || rows <= 0) {
         return bbb::dmx::mapper_result::failure("grid cols and rows must be positive");
     }
-    const double cell_width{1.0 / (double)cols};
-    const double cell_height{1.0 / (double)rows};
+    const double bounds_width{x1 - x0};
+    const double bounds_height{y1 - y0};
+    const double cell_width{bounds_width / (double)cols};
+    const double cell_height{bounds_height / (double)rows};
     for(int row = 0; row < rows; row++) {
         for(int col = 0; col < cols; col++) {
             const int fixture_index{start_index + row * cols + col};
@@ -467,10 +521,21 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
             fixture_mapping mapping{};
             mapping.fixture_id = fixture_id_buffer;
             mapping.sample.mode = mode;
-            mapping.sample.x = ((double)col + 0.5) * cell_width;
-            mapping.sample.y = ((double)row + 0.5) * cell_height;
-            mapping.sample.width = cell_width;
-            mapping.sample.height = cell_height;
+            if(placement == grid_placement::points) {
+                mapping.sample.x = cols == 1
+                    ? x0 + bounds_width * 0.5
+                    : x0 + ((double)col / (double)(cols - 1)) * bounds_width;
+                mapping.sample.y = rows == 1
+                    ? y0 + bounds_height * 0.5
+                    : y0 + ((double)row / (double)(rows - 1)) * bounds_height;
+                mapping.sample.width = 0.0;
+                mapping.sample.height = 0.0;
+            } else {
+                mapping.sample.x = x0 + ((double)col + 0.5) * cell_width;
+                mapping.sample.y = y0 + ((double)row + 0.5) * cell_height;
+                mapping.sample.width = cell_width;
+                mapping.sample.height = cell_height;
+            }
             mapping.parameters = bindings;
             config.fixtures.push_back(mapping);
         }

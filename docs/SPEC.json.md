@@ -384,7 +384,12 @@ Typical path: `maps/*.json`.
     "start_index": 1,
     "cols": 2,
     "rows": 2,
+    "x0": 0.0,
+    "y0": 0.0,
+    "x1": 1.0,
+    "y1": 1.0,
     "mode": "average",
+    "placement": "cell",
     "params": { "red": "r", "green": "g", "blue": "b" }
   }
 }
@@ -420,9 +425,13 @@ Top-level must contain at least one of `fixtures`, `grid`, or `grids`.
 | `rows` | integer | yes | — | Grid rows, positive. |
 | `start_index` | integer | no | `1` | First fixture index. |
 | `mode` | string | no | `average` | Sample mode for all generated cells. |
+| `x0`, `y0`, `x1`, `y1` | number | no | `0, 0, 1, 1` | Normalized top-left and bottom-right bounds. Runtime requires `x0 <= x1` and `y0 <= y1`. |
+| `placement` | string | no | `cell` | `cell`/`cells` uses bounded cell centers and sizes. `points`/`intersections` uses bounded grid intersections including endpoints and sets generated sample `w/h` to `0`. |
 | `params` | object | yes | — | Parameter-to-source bindings. |
 
 `grids` is an array of grid objects. `grid` is a single grid object convenience form.
+
+For `placement: "cell"`, `cols`/`rows` divide the bounded rectangle into cells. For `placement: "points"`, `cols`/`rows` are the number of generated fixture positions on each axis; if an axis has only one point, that axis samples the center of its bounds.
 
 ### 4.6 Parameter source bindings
 

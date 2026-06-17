@@ -178,6 +178,34 @@
               }
             ]
           }
+        },
+        "x0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "x1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "placement": {
+          "enum": [
+            "cell",
+            "cells",
+            "points",
+            "intersections"
+          ]
         }
       }
     },
@@ -247,6 +275,34 @@
                 }
               ]
             }
+          },
+          "x0": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y0": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "x1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y1": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "placement": {
+            "enum": [
+              "cell",
+              "cells",
+              "points",
+              "intersections"
+            ]
           }
         }
       },
@@ -430,6 +486,34 @@
                   }
                 ]
               }
+            },
+            "x0": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "y0": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "x1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "y1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "placement": {
+              "enum": [
+                "cell",
+                "cells",
+                "points",
+                "intersections"
+              ]
             }
           }
         }
@@ -506,6 +590,34 @@
                     }
                   ]
                 }
+              },
+              "x0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "y0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "x1": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "y1": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "placement": {
+                "enum": [
+                  "cell",
+                  "cells",
+                  "points",
+                  "intersections"
+                ]
               }
             }
           },

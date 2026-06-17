@@ -628,6 +628,73 @@ int main() {
     })json", matrix_map);
     require(!map_result.ok, "matrixmap fixture mapping rejects id and group together");
 
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "grid": {
+            "fixture_pattern": "pixel_%02d",
+            "start_index": 1,
+            "cols": 2,
+            "rows": 2,
+            "x0": 0.2,
+            "y0": 0.1,
+            "x1": 0.8,
+            "y1": 0.9,
+            "mode": "average",
+            "placement": "cell",
+            "params": { "red": "r" }
+        }
+    })json", matrix_map);
+    require(map_result.ok, "matrixmap bounded cell grid parses");
+    require(matrix_map.fixtures.size() == 4, "matrixmap bounded cell grid expands count");
+    require(matrix_map.fixtures[0].fixture_id == "pixel_01", "matrixmap bounded cell grid first id");
+    require(nearly_equal(matrix_map.fixtures[0].sample.x, 0.35), "matrixmap bounded cell grid first x center");
+    require(nearly_equal(matrix_map.fixtures[0].sample.y, 0.3), "matrixmap bounded cell grid first y center");
+    require(nearly_equal(matrix_map.fixtures[0].sample.width, 0.3), "matrixmap bounded cell grid cell width");
+    require(nearly_equal(matrix_map.fixtures[0].sample.height, 0.4), "matrixmap bounded cell grid cell height");
+    require(nearly_equal(matrix_map.fixtures[3].sample.x, 0.65), "matrixmap bounded cell grid last x center");
+    require(nearly_equal(matrix_map.fixtures[3].sample.y, 0.7), "matrixmap bounded cell grid last y center");
+
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "grid": {
+            "fixture_pattern": "point_%02d",
+            "start_index": 10,
+            "cols": 3,
+            "rows": 2,
+            "x0": 0.2,
+            "y0": 0.1,
+            "x1": 0.8,
+            "y1": 0.9,
+            "mode": "point",
+            "placement": "points",
+            "params": { "red": "r" }
+        }
+    })json", matrix_map);
+    require(map_result.ok, "matrixmap bounded points grid parses");
+    require(matrix_map.fixtures.size() == 6, "matrixmap bounded points grid expands count");
+    require(matrix_map.fixtures[0].fixture_id == "point_10", "matrixmap bounded points grid first id");
+    require(nearly_equal(matrix_map.fixtures[0].sample.x, 0.2), "matrixmap bounded points grid first x");
+    require(nearly_equal(matrix_map.fixtures[0].sample.y, 0.1), "matrixmap bounded points grid first y");
+    require(nearly_equal(matrix_map.fixtures[1].sample.x, 0.5), "matrixmap bounded points grid middle x");
+    require(nearly_equal(matrix_map.fixtures[1].sample.y, 0.1), "matrixmap bounded points grid middle y");
+    require(nearly_equal(matrix_map.fixtures[5].sample.x, 0.8), "matrixmap bounded points grid last x");
+    require(nearly_equal(matrix_map.fixtures[5].sample.y, 0.9), "matrixmap bounded points grid last y");
+    require(nearly_equal(matrix_map.fixtures[5].sample.width, 0.0), "matrixmap bounded points grid has no sample width");
+    require(nearly_equal(matrix_map.fixtures[5].sample.height, 0.0), "matrixmap bounded points grid has no sample height");
+
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "grid": {
+            "fixture_pattern": "bad_%02d",
+            "cols": 2,
+            "rows": 2,
+            "x0": 0.8,
+            "x1": 0.2,
+            "params": { "red": "r" }
+        }
+    })json", matrix_map);
+    require(!map_result.ok, "matrixmap grid rejects reversed bounds");
+
 
     bbb::dmx::fixture_mode rgb_mode{make_semantic_color_mode({"red", "green", "blue"})};
     bbb::dmx::semantic_color_mapping color_mapping{bbb::dmx::semantic_color_parameters_for_mode(
