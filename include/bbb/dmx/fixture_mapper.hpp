@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "bbb/dmx/fixture_patch.hpp"
@@ -250,6 +251,37 @@ public:
             return mapper_result::success();
         }
         value = target_universe.channel(first_address);
+        return mapper_result::success();
+    }
+
+    mapper_result parameter_channel_addresses(
+        const std::string &fixture_id,
+        const std::string &parameter_key,
+        std::vector<std::pair<int, int>> &addresses
+    ) const
+    {
+        addresses.clear();
+        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
+        if(!resolved.ok) {
+            return mapper_result::failure(resolved.message);
+        }
+        std::size_t required_channel_count{1};
+        if(resolved.parameter->type == fixture_parameter_type::u16) {
+            required_channel_count = 2;
+        } else if(resolved.parameter->type == fixture_parameter_type::u24) {
+            required_channel_count = 3;
+        }
+        if(resolved.parameter->channels.size() < required_channel_count) {
+            return mapper_result::failure("parameter has too few channels: " + parameter_key);
+        }
+        addresses.reserve(required_channel_count);
+        for(std::size_t index{0}; index < required_channel_count; index++) {
+            const fixture_channel *channel{resolved.mode->find_channel(resolved.parameter->channels[index])};
+            if(!channel) {
+                return mapper_result::failure("parameter channel missing: " + parameter_key);
+            }
+            addresses.push_back({resolved.fixture->universe, resolved.fixture->address + channel->offset - 1});
+        }
         return mapper_result::success();
     }
 

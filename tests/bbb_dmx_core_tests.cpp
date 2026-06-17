@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "bbb/dmx/common.hpp"
@@ -397,6 +398,17 @@ int main() {
     require(map_result.ok, "fixture mapper sets u16 parameter");
     require(mapper.universe(1).channel(10) == 0x12, "fixture mapper maps u16 coarse byte");
     require(mapper.universe(1).channel(11) == 0x34, "fixture mapper maps u16 fine byte");
+
+    std::vector<std::pair<int, int>> parameter_addresses{};
+    map_result = mapper.parameter_channel_addresses("spot_01", "pan", parameter_addresses);
+    require(map_result.ok, "fixture mapper resolves u16 parameter addresses");
+    require(parameter_addresses.size() == 2, "fixture mapper reports u16 address count");
+    require(parameter_addresses[0] == std::pair<int, int>{1, 10}, "fixture mapper reports u16 coarse address");
+    require(parameter_addresses[1] == std::pair<int, int>{1, 11}, "fixture mapper reports u16 fine address");
+    map_result = mapper.parameter_channel_addresses("spot_01", "dimmer", parameter_addresses);
+    require(map_result.ok, "fixture mapper resolves u8 parameter addresses");
+    require(parameter_addresses.size() == 1, "fixture mapper reports u8 address count");
+    require(parameter_addresses[0] == std::pair<int, int>{1, 14}, "fixture mapper reports u8 address");
 
     map_result = mapper.set_pan_tilt_bytes("spot_01", 1, 2, 3, 4);
     require(map_result.ok, "fixture mapper accepts movertrack byte tuple");
