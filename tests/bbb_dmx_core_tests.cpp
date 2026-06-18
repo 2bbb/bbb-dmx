@@ -610,6 +610,28 @@ int main() {
     require(map_result.ok, "fixture JSON mapper normalized set");
     require(json_mapper.universe(1).channel(25) == 128, "fixture JSON mapper normalized dimmer");
 
+    bbb::dmx::fixture_instance group_fixture_a{};
+    group_fixture_a.id = "fixture_01";
+    bbb::dmx::fixture_instance group_fixture_b{};
+    group_fixture_b.id = "fixture_02";
+    bbb::dmx::fixture_patch group_patch{};
+    group_patch.fixtures = {group_fixture_a, group_fixture_b};
+    bbb::dmx::fixture_group_set group_set{};
+    map_result = bbb::dmx::parse_fixture_groups_text(R"json({
+        "schema": "bbb.dmx.groups.v1",
+        "groups": {
+            "front": ["fixture_02", "fixture_01", "fixture_02"]
+        }
+    })json", group_set);
+    require(map_result.ok, "fixture groups JSON parses");
+    map_result = bbb::dmx::validate_fixture_groups_for_patch(group_set, group_patch);
+    require(map_result.ok, "fixture groups validate against patch");
+    std::vector<std::string> resolved_group_fixture_ids{};
+    map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "front", resolved_group_fixture_ids);
+    require(map_result.ok, "fixture group resolves");
+    require(resolved_group_fixture_ids.size() == 2, "fixture group de-duplicates fixture ids");
+    require(resolved_group_fixture_ids[0] == "fixture_02" && resolved_group_fixture_ids[1] == "fixture_01", "fixture group resolves in group JSON order");
+
 
     bbb::dmx::matrixmap::matrix_map_config matrix_map{};
     map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({

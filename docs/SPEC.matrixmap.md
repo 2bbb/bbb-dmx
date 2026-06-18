@@ -113,7 +113,7 @@ Fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | Fixture id in the loaded patch. Mutually exclusive with `group`. |
-| `group` | string | Loaded fixture group id. Mutually exclusive with `id`; the same sample and params are applied to every resolved fixture in patch order. |
+| `group` | string | Loaded fixture group id. Mutually exclusive with `id`; the same sample and params are applied to every resolved fixture in group JSON array order. |
 | `sample.x`, `sample.y` | number | Normalized matrix coordinates, `0..1`. |
 | `sample.mode` | `point` or `average` | Single-pixel lookup or rectangular average. |
 | `sample.w`, `sample.h` | number | Normalized average region size. Only used by `average`. |

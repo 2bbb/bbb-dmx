@@ -142,19 +142,17 @@ inline mapper_result resolve_fixture_group_fixture_ids(
     }
 
     std::set<std::string> requested_ids{};
+    fixture_ids.clear();
+    fixture_ids.reserve(group->fixture_ids.size());
     for(const auto &fixture_id : group->fixture_ids) {
         if(!find_patch_fixture(patch, fixture_id)) {
             return mapper_result::failure("group " + group_id + " references unknown fixture: " + fixture_id);
         }
-        requested_ids.insert(fixture_id);
-    }
-
-    fixture_ids.clear();
-    fixture_ids.reserve(requested_ids.size());
-    for(const auto &fixture : patch.fixtures) {
-        if(requested_ids.find(fixture.id) != requested_ids.end()) {
-            fixture_ids.push_back(fixture.id);
+        if(requested_ids.find(fixture_id) != requested_ids.end()) {
+            continue;
         }
+        requested_ids.insert(fixture_id);
+        fixture_ids.push_back(fixture_id);
     }
     return mapper_result::success();
 }
