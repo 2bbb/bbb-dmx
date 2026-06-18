@@ -260,6 +260,12 @@ int main() {
     output = engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
     require(nearly_equal(output.pan_degrees, -90.0), "movertrack GDTF right pan degrees");
 
+    bbb::dmx::movertrack_engine rotated_engine{};
+    require(rotated_engine.set_rotation_degrees(bbb::dmx::vec3{0.0, 0.0, 90.0}), "movertrack accepts fixture rotation");
+    output = rotated_engine.compute(bbb::dmx::vec3{0.0, 10.0, 0.0});
+    require(nearly_equal(output.pan_degrees, -90.0), "movertrack uses cached inverse rotation for pan");
+    require(nearly_equal(output.tilt_degrees, 90.0), "movertrack uses cached inverse rotation for tilt");
+
     bbb::dmx::movertrack_engine relative_engine{};
     relative_engine.set_tracking_mode(bbb::dmx::tracking_mode::off);
     relative_engine.set_fixture_position(bbb::dmx::vec3{5.0, 10.0, 2.0});
@@ -416,6 +422,14 @@ int main() {
     require(mapper.universe(1).channel(11) == 2, "fixture mapper maps pan byte 2");
     require(mapper.universe(1).channel(12) == 3, "fixture mapper maps tilt byte 1");
     require(mapper.universe(1).channel(13) == 4, "fixture mapper maps tilt byte 2");
+
+    const auto universe_snapshot = mapper.universe_snapshot();
+    map_result = mapper.set_u8("spot_01", "dimmer", 12);
+    require(map_result.ok, "fixture mapper mutates after universe snapshot");
+    require(mapper.universe(1).channel(14) == 12, "fixture mapper writes after universe snapshot");
+    mapper.restore_universes(universe_snapshot);
+    require(mapper.universe(1).channel(14) == 255, "fixture mapper restores universe snapshot");
+    require(mapper.patch().fixtures.size() == 1, "fixture mapper universe restore preserves patch metadata");
 
     bbb::dmx::fixture_patch overlap_patch{};
     bbb::dmx::fixture_instance overlap_a{fixture};

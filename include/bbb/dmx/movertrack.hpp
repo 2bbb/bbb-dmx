@@ -41,6 +41,7 @@ public:
     {
         settings_.pan_range_degrees = sanitize_positive_range(settings_.pan_range_degrees);
         settings_.tilt_range_degrees = sanitize_positive_range(settings_.tilt_range_degrees);
+        update_world_to_local_matrix();
     }
 
     const movertrack_settings &settings() const {
@@ -59,7 +60,14 @@ public:
         if(!rotation_degrees.finite()) {
             return false;
         }
+        if(settings_.rotation_degrees.x == rotation_degrees.x
+            && settings_.rotation_degrees.y == rotation_degrees.y
+            && settings_.rotation_degrees.z == rotation_degrees.z)
+        {
+            return true;
+        }
         settings_.rotation_degrees = rotation_degrees;
+        update_world_to_local_matrix();
         return true;
     }
 
@@ -210,12 +218,7 @@ private:
         if(world_vector.nearly_zero()) {
             return false;
         }
-        const vec3 local_vector{world_to_fixture_local(
-            world_vector,
-            settings_.rotation_degrees.x,
-            settings_.rotation_degrees.y,
-            settings_.rotation_degrees.z
-        )};
+        const vec3 local_vector{world_to_local_matrix_ * world_vector};
         angles = vector_to_pan_tilt(local_vector);
         return true;
     }
@@ -304,12 +307,7 @@ private:
             return has_last_output_ ? last_output_with_current_order() : neutral_output();
         }
 
-        const vec3 local_vector{world_to_fixture_local(
-            world_vector,
-            settings_.rotation_degrees.x,
-            settings_.rotation_degrees.y,
-            settings_.rotation_degrees.z
-        )};
+        const vec3 local_vector{world_to_local_matrix_ * world_vector};
 
         const pan_tilt_degrees raw_angles{vector_to_pan_tilt(local_vector)};
         pan_tilt_degrees angles{choose_tracking_solution(raw_angles, local_vector)};
@@ -363,7 +361,16 @@ private:
         return output;
     }
 
+    void update_world_to_local_matrix() {
+        world_to_local_matrix_ = fixture_rotation_xyz_degrees(
+            settings_.rotation_degrees.x,
+            settings_.rotation_degrees.y,
+            settings_.rotation_degrees.z
+        ).transpose();
+    }
+
     movertrack_settings settings_{};
+    mat3 world_to_local_matrix_{mat3::identity()};
     vec3 last_target_{};
     vec3 last_relative_target_{};
     bool last_target_is_relative_{false};

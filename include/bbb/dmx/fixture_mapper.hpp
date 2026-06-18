@@ -31,6 +31,8 @@ public:
 
 class fixture_mapper {
 public:
+    using universe_map = std::map<int, dmx_universe>;
+
     void clear() {
         profiles_.clear();
         patch_ = fixture_patch{};
@@ -316,6 +318,14 @@ public:
             return empty_universe;
         }
         return found->second;
+    }
+
+    universe_map universe_snapshot() const {
+        return universes_;
+    }
+
+    void restore_universes(const universe_map &universes) {
+        universes_ = universes;
     }
 
     std::vector<int> universe_ids() const {

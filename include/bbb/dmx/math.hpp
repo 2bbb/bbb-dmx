@@ -62,7 +62,7 @@ public:
     }
 
     bool nearly_zero(double epsilon = vector_epsilon) const {
-        return length() < epsilon;
+        return length_squared() < epsilon * epsilon;
     }
 };
 
