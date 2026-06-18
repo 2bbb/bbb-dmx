@@ -1038,7 +1038,7 @@ int main() {
         bbb::dmx::semantic_color_options{true, true}
     );
     require(color_mapping.ok, "semantic color wheel fallback maps white to open");
-    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 4.0 / 255.0), "semantic color wheel fallback keeps first equal open without current value");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 0.0), "semantic color wheel fallback uses lowest open value without current value");
     require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 1.0), "semantic color wheel fallback opens dimmer for white");
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
         &wheel_profile,
@@ -1048,7 +1048,7 @@ int main() {
         {{"color_wheel", 105}}
     );
     require(color_mapping.ok, "semantic color wheel fallback maps white with current value");
-    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 104.0 / 255.0), "semantic color wheel fallback uses nearest equal open range");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 0.0), "semantic color wheel fallback ignores current value and uses lowest open");
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
         &wheel_profile,
         wheel_mode,
@@ -1057,7 +1057,7 @@ int main() {
         {{"gobo", 5}, {"prism", 9}}
     );
     require(color_mapping.ok, "semantic color wheel fallback ignores non-color wheels");
-    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 4.0 / 255.0), "semantic color wheel fallback keeps color wheel open when gobo or prism is nearer");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 0.0), "semantic color wheel fallback uses lowest color wheel open when gobo or prism is nearer");
     require(find_semantic_parameter(color_mapping, "gobo") == nullptr, "semantic color wheel fallback does not write gobo wheels");
     require(find_semantic_parameter(color_mapping, "prism") == nullptr, "semantic color wheel fallback does not write prism wheels");
     color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
@@ -1068,7 +1068,7 @@ int main() {
         {{"color_wheel", 105}}
     );
     require(color_mapping.ok, "semantic color wheel fallback maps black to open");
-    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 104.0 / 255.0), "semantic color wheel fallback maps black to nearest open range");
+    require(nearly_equal(*find_semantic_parameter(color_mapping, "color_wheel"), 0.0), "semantic color wheel fallback maps black to lowest open");
     require(nearly_equal(*find_semantic_parameter(color_mapping, "dimmer"), 0.0), "semantic color wheel fallback maps black to dimmer closed");
 
     bbb::dmx::fixture_mode shutter_mode{make_semantic_shutter_mode("shutter", "shutter")};

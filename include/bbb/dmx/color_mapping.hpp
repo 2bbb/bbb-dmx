@@ -368,8 +368,12 @@ inline int color_parameter_max_value(const fixture_parameter &parameter) {
     return 255;
 }
 
+inline int color_range_low_value(const fixture_parameter_range &range) {
+    return std::min(range.from, range.to);
+}
+
 inline int color_range_center_value(const fixture_parameter_range &range) {
-    const int minimum{std::min(range.from, range.to)};
+    const int minimum{color_range_low_value(range)};
     const int maximum{std::max(range.from, range.to)};
     return minimum + (maximum - minimum) / 2;
 }
@@ -515,6 +519,11 @@ inline double color_distance_squared(const semantic_color_request &left, const s
     const double green_delta{left.green - right.green};
     const double blue_delta{left.blue - right.blue};
     return red_delta * red_delta + green_delta * green_delta + blue_delta * blue_delta;
+}
+
+inline bool semantic_color_is_nearly_white(const semantic_color_request &color) {
+    constexpr double distance_epsilon{1.0e-12};
+    return color_distance_squared(color, make_semantic_color_request(1.0, 1.0, 1.0)) <= distance_epsilon;
 }
 
 inline int current_parameter_distance(
@@ -689,11 +698,16 @@ inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
             make_semantic_color_request(1.0, 1.0, 1.0) :
             make_semantic_color_request(color.red / intensity, color.green / intensity, color.blue / intensity)
     };
+    const bool request_uses_open_slot{semantic_color_is_nearly_white(match_color)};
     const fixture_parameter *best_parameter{nullptr};
     const fixture_parameter_range *best_range{nullptr};
     double best_distance{std::numeric_limits<double>::infinity()};
     int best_bias{0};
     int best_current_distance{std::numeric_limits<int>::max()};
+    const fixture_parameter *best_open_parameter{nullptr};
+    const fixture_parameter_range *best_open_range{nullptr};
+    int best_open_value{std::numeric_limits<int>::max()};
+    int best_open_bias{0};
     constexpr double distance_epsilon{1.0e-12};
 
     for(const auto &parameter : mode.parameters) {
@@ -712,6 +726,20 @@ inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
             if(!range.wheel.empty() || !parameter.wheel.empty()) {
                 bias += 10;
             }
+
+            const int range_low{color_range_low_value(range)};
+            if(request_uses_open_slot && semantic_color_is_nearly_white(slot_color)) {
+                const bool better_open_value{!best_open_range || range_low < best_open_value};
+                const bool same_open_value{best_open_range && range_low == best_open_value};
+                const bool better_open_bias{same_open_value && best_open_bias < bias};
+                if(better_open_value || better_open_bias) {
+                    best_open_parameter = &parameter;
+                    best_open_range = &range;
+                    best_open_value = range_low;
+                    best_open_bias = bias;
+                }
+            }
+
             const double distance{color_distance_squared(match_color, slot_color)};
             const int range_center{color_range_center_value(range)};
             const int current_distance{current_parameter_distance(current_parameter_values, parameter.key, range_center)};
@@ -730,12 +758,16 @@ inline semantic_color_mapping semantic_color_wheel_fallback_parameters_for_mode(
         }
     }
 
-    if(!best_parameter || !best_range) {
+    const bool use_open_candidate{request_uses_open_slot && best_open_parameter && best_open_range};
+    const fixture_parameter *selected_parameter{use_open_candidate ? best_open_parameter : best_parameter};
+    const fixture_parameter_range *selected_range{use_open_candidate ? best_open_range : best_range};
+    if(!selected_parameter || !selected_range) {
         return semantic_color_mapping::failure("fixture has no semantic color model");
     }
 
+    const int selected_value{use_open_candidate ? best_open_value : color_range_center_value(*selected_range)};
     std::vector<std::pair<std::string, double>> parameters{
-        {best_parameter->key, (double)color_range_center_value(*best_range) / (double)color_parameter_max_value(*best_parameter)}
+        {selected_parameter->key, (double)selected_value / (double)color_parameter_max_value(*selected_parameter)}
     };
     if(mode_has_semantic_parameter(mode, "dimmer")) {
         parameters.push_back({"dimmer", intensity});
