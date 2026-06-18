@@ -494,9 +494,6 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
     if(x0 < 0.0 || 1.0 < x0 || y0 < 0.0 || 1.0 < y0 || x1 < 0.0 || 1.0 < x1 || y1 < 0.0 || 1.0 < y1) {
         return bbb::dmx::mapper_result::failure("grid bounds must be normalized 0..1");
     }
-    if(x1 < x0 || y1 < y0) {
-        return bbb::dmx::mapper_result::failure("grid bounds require x0 <= x1 and y0 <= y1");
-    }
     const bbb::dmx::json_value *params{object.find("params")};
     if(!params) {
         return bbb::dmx::mapper_result::failure("grid requires params");
@@ -513,6 +510,8 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
     const double bounds_height{y1 - y0};
     const double cell_width{bounds_width / (double)cols};
     const double cell_height{bounds_height / (double)rows};
+    const double sample_width{std::abs(cell_width)};
+    const double sample_height{std::abs(cell_height)};
     for(int row = 0; row < rows; row++) {
         for(int col = 0; col < cols; col++) {
             const int fixture_index{start_index + row * cols + col};
@@ -533,8 +532,8 @@ inline bbb::dmx::mapper_result expand_grid(const bbb::dmx::json_value &object, m
             } else {
                 mapping.sample.x = x0 + ((double)col + 0.5) * cell_width;
                 mapping.sample.y = y0 + ((double)row + 0.5) * cell_height;
-                mapping.sample.width = cell_width;
-                mapping.sample.height = cell_height;
+                mapping.sample.width = sample_width;
+                mapping.sample.height = sample_height;
             }
             mapping.parameters = bindings;
             config.fixtures.push_back(mapping);

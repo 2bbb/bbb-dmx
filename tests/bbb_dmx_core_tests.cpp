@@ -697,15 +697,44 @@ int main() {
     map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
         "schema": "bbb.dmx.matrixmap.v1",
         "grid": {
-            "fixture_pattern": "bad_%02d",
+            "fixture_pattern": "reverse_%02d",
             "cols": 2,
             "rows": 2,
             "x0": 0.8,
+            "y0": 0.0,
             "x1": 0.2,
+            "y1": 1.0,
+            "placement": "cell",
             "params": { "red": "r" }
         }
     })json", matrix_map);
-    require(!map_result.ok, "matrixmap grid rejects reversed bounds");
+    require(map_result.ok, "matrixmap grid accepts reversed x bounds");
+    require(matrix_map.fixtures.size() == 4, "matrixmap reversed grid expands count");
+    require(nearly_equal(matrix_map.fixtures[0].sample.x, 0.65), "matrixmap reversed grid first x center");
+    require(nearly_equal(matrix_map.fixtures[1].sample.x, 0.35), "matrixmap reversed grid second x center");
+    require(nearly_equal(matrix_map.fixtures[0].sample.width, 0.3), "matrixmap reversed grid uses positive cell width");
+    require(nearly_equal(matrix_map.fixtures[0].sample.height, 0.5), "matrixmap reversed grid uses positive cell height");
+
+    map_result = bbb::dmx::matrixmap::parse_matrix_map_text(R"json({
+        "schema": "bbb.dmx.matrixmap.v1",
+        "grid": {
+            "fixture_pattern": "flat_%02d",
+            "cols": 3,
+            "rows": 2,
+            "x0": 0.4,
+            "y0": 0.6,
+            "x1": 0.4,
+            "y1": 0.6,
+            "placement": "points",
+            "params": { "red": "r" }
+        }
+    })json", matrix_map);
+    require(map_result.ok, "matrixmap grid accepts zero-area bounds");
+    require(matrix_map.fixtures.size() == 6, "matrixmap zero-area grid expands count");
+    require(nearly_equal(matrix_map.fixtures[0].sample.x, 0.4), "matrixmap zero-area grid first x");
+    require(nearly_equal(matrix_map.fixtures[0].sample.y, 0.6), "matrixmap zero-area grid first y");
+    require(nearly_equal(matrix_map.fixtures[5].sample.x, 0.4), "matrixmap zero-area grid last x");
+    require(nearly_equal(matrix_map.fixtures[5].sample.y, 0.6), "matrixmap zero-area grid last y");
 
     std::vector<float> float32_rgb_noise(100 * 100 * 3, 0.0f);
     const long sample_x{50};
