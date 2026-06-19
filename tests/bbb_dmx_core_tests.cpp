@@ -1,6 +1,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -638,13 +639,35 @@ int main() {
     group_fixture_a.id = "fixture_01";
     bbb::dmx::fixture_instance group_fixture_b{};
     group_fixture_b.id = "fixture_02";
+    bbb::dmx::fixture_instance group_fixture_c{};
+    group_fixture_c.id = "fixture_03";
     bbb::dmx::fixture_patch group_patch{};
-    group_patch.fixtures = {group_fixture_a, group_fixture_b};
+    group_patch.fixtures = {group_fixture_a, group_fixture_b, group_fixture_c};
+    for(int fixture_index{1}; fixture_index < 3; fixture_index++) {
+        bbb::dmx::fixture_instance generated_fixture{};
+        char fixture_id_buffer[32]{};
+        std::snprintf(fixture_id_buffer, sizeof(fixture_id_buffer), "D_%02d", fixture_index);
+        generated_fixture.id = fixture_id_buffer;
+        group_patch.fixtures.push_back(generated_fixture);
+    }
+    for(int fixture_index{100}; fixture_index < 116; fixture_index++) {
+        bbb::dmx::fixture_instance generated_fixture{};
+        char fixture_id_buffer[32]{};
+        std::snprintf(fixture_id_buffer, sizeof(fixture_id_buffer), "D_%02d", fixture_index);
+        generated_fixture.id = fixture_id_buffer;
+        group_patch.fixtures.push_back(generated_fixture);
+    }
     bbb::dmx::fixture_group_set group_set{};
     map_result = bbb::dmx::parse_fixture_groups_text(R"json({
         "schema": "bbb.dmx.groups.v1",
         "groups": {
-            "front": ["fixture_02", "fixture_01", "fixture_02"]
+            "front": ["fixture_02", "fixture_01", "fixture_02"],
+            "A": ["fixture_01", "fixture_02"],
+            "B": ["fixture_02", "fixture_03"],
+            "ABC": [{"group": "A"}, {"group": "B"}, "fixture_01"],
+            "small": [{"fixture_pattern": "D_%02d", "start_index": 1, "num": 2}],
+            "D": [{"fixture_pattern": "D_%02d", "start_index": 100, "num": 16}],
+            "mixed": [{"group": "A"}, {"fixture_pattern": "D_%02d", "start_index": 100, "num": 2}, "D_100"]
         }
     })json", group_set);
     require(map_result.ok, "fixture groups JSON parses");
@@ -655,6 +678,41 @@ int main() {
     require(map_result.ok, "fixture group resolves");
     require(resolved_group_fixture_ids.size() == 2, "fixture group de-duplicates fixture ids");
     require(resolved_group_fixture_ids[0] == "fixture_02" && resolved_group_fixture_ids[1] == "fixture_01", "fixture group resolves in group JSON order");
+    map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "ABC", resolved_group_fixture_ids);
+    require(map_result.ok, "nested fixture group resolves");
+    require(resolved_group_fixture_ids.size() == 3, "nested fixture group de-duplicates expanded fixture ids");
+    require(resolved_group_fixture_ids[0] == "fixture_01" && resolved_group_fixture_ids[1] == "fixture_02" && resolved_group_fixture_ids[2] == "fixture_03", "nested fixture group resolves referenced groups in authored order");
+    map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "small", resolved_group_fixture_ids);
+    require(map_result.ok, "zero-padded fixture_pattern group resolves");
+    require(resolved_group_fixture_ids.size() == 2, "zero-padded fixture_pattern group expands requested count");
+    require(resolved_group_fixture_ids[0] == "D_01" && resolved_group_fixture_ids[1] == "D_02", "fixture_pattern applies printf-style zero padding");
+    map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "D", resolved_group_fixture_ids);
+    require(map_result.ok, "fixture_pattern group resolves");
+    require(resolved_group_fixture_ids.size() == 16, "fixture_pattern group expands requested count");
+    require(resolved_group_fixture_ids[0] == "D_100" && resolved_group_fixture_ids[15] == "D_115", "fixture_pattern group formats sequential ids");
+    map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "mixed", resolved_group_fixture_ids);
+    require(map_result.ok, "mixed nested and fixture_pattern group resolves");
+    require(resolved_group_fixture_ids.size() == 4, "mixed group de-duplicates generated fixture ids");
+    require(resolved_group_fixture_ids[0] == "fixture_01" && resolved_group_fixture_ids[1] == "fixture_02" && resolved_group_fixture_ids[2] == "D_100" && resolved_group_fixture_ids[3] == "D_101", "mixed group preserves authored expansion order");
+    bbb::dmx::fixture_group_set cyclic_group_set{};
+    map_result = bbb::dmx::parse_fixture_groups_text(R"json({
+        "schema": "bbb.dmx.groups.v1",
+        "groups": {
+            "loop_a": [{"group": "loop_b"}],
+            "loop_b": [{"group": "loop_a"}]
+        }
+    })json", cyclic_group_set);
+    require(map_result.ok, "cyclic fixture groups JSON parses");
+    map_result = bbb::dmx::validate_fixture_groups_for_patch(cyclic_group_set, group_patch);
+    require(!map_result.ok, "cyclic fixture groups are rejected");
+    bbb::dmx::fixture_group_set invalid_pattern_group_set{};
+    map_result = bbb::dmx::parse_fixture_groups_text(R"json({
+        "schema": "bbb.dmx.groups.v1",
+        "groups": {
+            "bad": [{"fixture_pattern": "D_%02", "start_index": 1, "num": 1}]
+        }
+    })json", invalid_pattern_group_set);
+    require(!map_result.ok, "fixture_pattern without integer conversion suffix is rejected");
 
 
     bbb::dmx::matrixmap::matrix_map_config matrix_map{};

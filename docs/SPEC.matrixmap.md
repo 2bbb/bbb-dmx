@@ -23,7 +23,7 @@ Input:
 - `jit_matrix <name>` — read one Jitter matrix by registered name and patch sampled values into fixture parameters.
 - `readpatch <path>` — load fixture patch JSON.
 - `readmap <path>` — load matrix map JSON.
-- `readgroups <path>` — load optional fixture groups JSON for explicit group mappings.
+- `readgroups <path>` — load optional fixture groups JSON for explicit/nested/pattern group mappings.
 - `readoverrides <path>` — load optional semantic overrides JSON for aliases and semantic color mapping.
 - `reload` — reload current patch, map, groups, and semantic overrides files.
 - `bang` — output current DMX buffers without re-sampling.
