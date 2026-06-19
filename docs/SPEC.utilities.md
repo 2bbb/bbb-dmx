@@ -33,11 +33,19 @@ Stores the latest known frame per universe and can emit either full frames or ch
 
 Merges named layers across multiple universes.
 
-- Input: `universe layer id ...`, `layer layer id ...`, `channel`, `channels`, `priority`, `clear`, `bang`, `bangall`, `dump`
+- Input: `universe layer id ...`, `layer layer id ...`, `channel`, `channels`, `priority`, `readpatch`, `readoverrides`, `reload`, `clear`, `bang`, `bangall`, `dump`
 - Output: merged `universe <id> ...`
+- Attributes: `@universe`, `@mode`, `@patch`, `@semantic_overrides`
 - Modes: `priority`, `htp`, `ltp`
 
 `priority` is the deterministic default for show-control patches. `htp` is useful for intensities. `ltp` is useful for controller takeover, but it is easier to misunderstand because recent zero values are still intentional values.
+
+If `@patch` is loaded, `htp` applies semantic CMY correction: native `cyan`/`magenta`/`yellow`
+parameters, plus parameters listed in `color.cmy` override blocks when `@semantic_overrides` is
+loaded, are merged as lowest-wins parameter groups rather than per-channel HTP. This is
+parameter-aware, so u16/u24 CMY values are compared as a whole and the winning layer's bytes are
+copied intact. The optional/associated CMY dimmer acts as an active-layer gate; zero-dimmer layers
+do not participate in the CMY lowest comparison.
 
 ### `bbb.dmx.fade`
 

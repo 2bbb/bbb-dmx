@@ -13,6 +13,7 @@
 #include "bbb/dmx/matrix_map.hpp"
 #include "bbb/dmx/movertrack.hpp"
 #include "bbb/dmx/pattern.hpp"
+#include "bbb/dmx/semantic_merge.hpp"
 
 namespace {
 
@@ -60,6 +61,15 @@ bbb::dmx::fixture_channel make_u8_channel(int offset, const std::string &key, in
     channel.key = key;
     channel.default_value = default_value;
     return channel;
+}
+
+bbb::dmx::fixture_parameter make_u16_parameter(const std::string &key, const std::string &coarse_key, const std::string &fine_key) {
+    bbb::dmx::fixture_parameter parameter{};
+    parameter.key = key;
+    parameter.type = bbb::dmx::fixture_parameter_type::u16;
+    parameter.channels = {coarse_key, fine_key};
+    parameter.order = bbb::dmx::byte_order::coarse_fine;
+    return parameter;
 }
 
 bbb::dmx::fixture_channel make_labeled_u8_channel(int offset, const std::string &key, const std::string &label, int default_value = 0) {
@@ -1361,6 +1371,104 @@ int main() {
     require(rgbw_mapper.universe(1).channel(2) == 128, "semantic RGBW mapper writes green with white disabled");
     require(rgbw_mapper.universe(1).channel(3) == 191, "semantic RGBW mapper writes blue with white disabled");
     require(rgbw_mapper.universe(1).channel(4) == 200, "semantic RGBW mapper leaves white untouched when disabled");
+
+    bbb::dmx::fixture_mode merge_cmy_mode{};
+    merge_cmy_mode.key = "extended";
+    merge_cmy_mode.footprint = 8;
+    merge_cmy_mode.channels = {
+        make_u8_channel(1, "dimmer.coarse"),
+        make_u8_channel(2, "dimmer.fine"),
+        make_u8_channel(3, "colorsub.c.coarse"),
+        make_u8_channel(4, "colorsub.c.fine"),
+        make_u8_channel(5, "colorsub.m.coarse"),
+        make_u8_channel(6, "colorsub.m.fine"),
+        make_u8_channel(7, "colorsub.y.coarse"),
+        make_u8_channel(8, "colorsub.y.fine")
+    };
+    merge_cmy_mode.parameters = {
+        make_u16_parameter("dimmer", "dimmer.coarse", "dimmer.fine"),
+        make_u16_parameter("colorsub.c", "colorsub.c.coarse", "colorsub.c.fine"),
+        make_u16_parameter("colorsub.m", "colorsub.m.coarse", "colorsub.m.fine"),
+        make_u16_parameter("colorsub.y", "colorsub.y.coarse", "colorsub.y.fine")
+    };
+    bbb::dmx::fixture_profile cmy_profile{};
+    cmy_profile.key = "test.cmy";
+    cmy_profile.modes = {merge_cmy_mode};
+    bbb::dmx::fixture_instance cmy_fixture{};
+    cmy_fixture.id = "101";
+    cmy_fixture.profile = "test.cmy";
+    cmy_fixture.mode = "extended";
+    cmy_fixture.universe = 7;
+    cmy_fixture.address = 20;
+    bbb::dmx::fixture_patch cmy_patch{};
+    cmy_patch.fixtures = {cmy_fixture};
+    bbb::dmx::fixture_mapper cmy_mapper{};
+    map_result = cmy_mapper.add_profile(cmy_profile);
+    require(map_result.ok, "semantic merge mapper accepts CMY profile");
+    map_result = cmy_mapper.set_patch(cmy_patch);
+    require(map_result.ok, "semantic merge mapper accepts CMY patch");
+
+    bbb::dmx::fixture_semantic_overrides cmy_overrides{};
+    map_result = bbb::dmx::parse_fixture_semantic_overrides_text(R"json({
+        "schema": "bbb.dmx.semantic_overrides.v1",
+        "profiles": {
+            "test.cmy": {
+                "modes": {
+                    "extended": {
+                        "color": {
+                            "cmy": [
+                                {
+                                    "cyan": "colorsub.c",
+                                    "magenta": "colorsub.m",
+                                    "yellow": "colorsub.y",
+                                    "dimmer": "dimmer"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    })json", cmy_overrides);
+    require(map_result.ok, "semantic merge CMY overrides parse");
+    bbb::dmx::semantic_merge_policy merge_policy{};
+    map_result = bbb::dmx::build_semantic_cmy_lowest_merge_policy(cmy_mapper, cmy_overrides, merge_policy);
+    require(map_result.ok, "semantic merge builds CMY lowest policy");
+    require(merge_policy.cmy_lowest_groups.size() == 3, "semantic merge creates one lowest group per CMY parameter");
+    const bbb::dmx::semantic_lowest_parameter_group &cyan_group = merge_policy.cmy_lowest_groups[0];
+    require(cyan_group.parameter.channels.size() == 2, "semantic merge keeps u16 CMY channels grouped");
+    require(cyan_group.parameter.channels[0].universe == 7 && cyan_group.parameter.channels[0].address == 22, "semantic merge maps CMY coarse address");
+    require(cyan_group.parameter.channels[1].universe == 7 && cyan_group.parameter.channels[1].address == 23, "semantic merge maps CMY fine address");
+    require(cyan_group.has_gate, "semantic merge records CMY dimmer gate");
+    require(cyan_group.gate.channels[0].address == 20 && cyan_group.gate.channels[1].address == 21, "semantic merge maps CMY dimmer gate as u16");
+    require(bbb::dmx::semantic_merge_parameter_raw_value(cyan_group.parameter, {0, 255}) == 255, "semantic merge combines u16 fine byte before comparing lowest");
+    require(bbb::dmx::semantic_merge_parameter_raw_value(cyan_group.parameter, {1, 0}) == 256, "semantic merge compares whole u16 value instead of per-byte minimum");
+
+    bbb::dmx::fixture_mode native_cmy_mode{make_semantic_color_mode({"dimmer", "cyan", "magenta", "yellow"})};
+    bbb::dmx::fixture_profile native_cmy_profile{};
+    native_cmy_profile.key = "test.native.cmy";
+    native_cmy_profile.modes = {native_cmy_mode};
+    bbb::dmx::fixture_instance native_cmy_fixture{};
+    native_cmy_fixture.id = "native_cmy_01";
+    native_cmy_fixture.profile = "test.native.cmy";
+    native_cmy_fixture.mode = "color";
+    native_cmy_fixture.universe = 3;
+    native_cmy_fixture.address = 100;
+    bbb::dmx::fixture_patch native_cmy_patch{};
+    native_cmy_patch.fixtures = {native_cmy_fixture};
+    bbb::dmx::fixture_mapper native_cmy_mapper{};
+    map_result = native_cmy_mapper.add_profile(native_cmy_profile);
+    require(map_result.ok, "semantic merge native CMY mapper accepts profile");
+    map_result = native_cmy_mapper.set_patch(native_cmy_patch);
+    require(map_result.ok, "semantic merge native CMY mapper accepts patch");
+    bbb::dmx::fixture_semantic_overrides empty_semantic_overrides{};
+    bbb::dmx::semantic_merge_policy native_cmy_policy{};
+    map_result = bbb::dmx::build_semantic_cmy_lowest_merge_policy(native_cmy_mapper, empty_semantic_overrides, native_cmy_policy);
+    require(map_result.ok, "semantic merge builds native CMY lowest policy without overrides");
+    require(native_cmy_policy.cmy_lowest_groups.size() == 3, "semantic merge auto-detects native CMY lowest groups");
+    require(native_cmy_policy.cmy_lowest_groups[0].parameter.key == "cyan", "semantic merge auto-detects cyan parameter");
+    require(native_cmy_policy.cmy_lowest_groups[0].has_gate, "semantic merge auto-detects associated CMY dimmer gate");
+    require(native_cmy_policy.cmy_lowest_groups[0].gate.channels[0].universe == 3 && native_cmy_policy.cmy_lowest_groups[0].gate.channels[0].address == 100, "semantic merge maps native CMY dimmer gate");
 
     std::cout << "bbb_dmx_common_tests passed" << std::endl;
     return 0;
