@@ -443,6 +443,22 @@ int main() {
     require(mapper.universe(1).channel(14) == 255, "fixture mapper restores universe snapshot");
     require(mapper.patch().fixtures.size() == 1, "fixture mapper universe restore preserves patch metadata");
 
+    map_result = mapper.set_normalized("spot_01", "dimmer", 0.5);
+    require(map_result.ok, "fixture mapper caches normalized write target");
+    require(mapper.universe(1).channel(14) == 128, "fixture mapper writes normalized cached target");
+    bbb::dmx::fixture_patch moved_patch{};
+    bbb::dmx::fixture_instance moved_fixture{fixture};
+    moved_fixture.address = 20;
+    moved_patch.fixtures = {moved_fixture};
+    map_result = mapper.set_patch(moved_patch);
+    require(map_result.ok, "fixture mapper accepts moved fixture patch");
+    map_result = mapper.set_normalized("spot_01", "dimmer", 0.25);
+    require(map_result.ok, "fixture mapper normalized target cache is invalidated by set_patch");
+    require(mapper.universe(1).channel(14) == 0, "fixture mapper does not write stale normalized target after set_patch");
+    require(mapper.universe(1).channel(24) == 64, "fixture mapper writes normalized target at moved address");
+    map_result = mapper.set_patch(patch);
+    require(map_result.ok, "fixture mapper restores original patch after cache invalidation test");
+
     bbb::dmx::fixture_patch overlap_patch{};
     bbb::dmx::fixture_instance overlap_a{fixture};
     bbb::dmx::fixture_instance overlap_b{fixture};
