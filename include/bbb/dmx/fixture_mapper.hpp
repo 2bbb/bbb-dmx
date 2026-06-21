@@ -201,13 +201,36 @@ public:
             return mapper_result::failure(resolved.message);
         }
         if(resolved.parameter->type == fixture_parameter_type::u16) {
-            return set_u16(fixture_id, parameter_key, normalized_to_u16(value));
+            if(resolved.parameter->channels.size() < 2) {
+                return mapper_result::failure("u16 parameter needs two channels: " + parameter_key);
+            }
+            const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
+            if(!first_channel) {
+                return mapper_result::failure("parameter first channel missing: " + parameter_key);
+            }
+            return write_u16(*resolved.fixture, *first_channel, normalized_to_u16(value), resolved.parameter->order);
         }
         if(resolved.parameter->type == fixture_parameter_type::u24) {
-            return set_u24(fixture_id, parameter_key, normalized_to_u24(value));
+            if(resolved.parameter->channels.size() < 3) {
+                return mapper_result::failure("u24 parameter needs three channels: " + parameter_key);
+            }
+            const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
+            if(!first_channel) {
+                return mapper_result::failure("parameter first channel missing: " + parameter_key);
+            }
+            return write_u24(*resolved.fixture, *first_channel, normalized_to_u24(value), resolved.parameter->order);
         }
-        const int int_value{(int)normalized_to_u8(value)};
-        return set_u8(fixture_id, parameter_key, int_value);
+        if(resolved.parameter->type != fixture_parameter_type::u8 && resolved.parameter->type != fixture_parameter_type::enum_u8) {
+            return mapper_result::failure("parameter is not normalized writable: " + parameter_key);
+        }
+        if(resolved.parameter->channels.empty()) {
+            return mapper_result::failure("parameter has no channel: " + parameter_key);
+        }
+        const fixture_channel *channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
+        if(!channel) {
+            return mapper_result::failure("parameter channel missing: " + parameter_key);
+        }
+        return write_u8(*resolved.fixture, *channel, (int)normalized_to_u8(value));
     }
 
     mapper_result current_raw_value(const std::string &fixture_id, const std::string &parameter_key, int &value) const {
