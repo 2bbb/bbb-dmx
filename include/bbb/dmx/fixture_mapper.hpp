@@ -36,6 +36,7 @@ public:
     void clear() {
         profiles_.clear();
         patch_ = fixture_patch{};
+        fixture_indices_.clear();
         universes_.clear();
         validated_ = false;
     }
@@ -51,6 +52,7 @@ public:
 
     mapper_result set_patch(const fixture_patch &patch) {
         patch_ = patch;
+        fixture_indices_.clear();
         validated_ = false;
         return validate_and_reset();
     }
@@ -58,8 +60,10 @@ public:
     mapper_result validate_and_reset() {
         std::set<std::string> fixture_ids;
         std::map<int, std::set<int>> occupied_channels;
+        std::map<std::string, std::size_t> fixture_indices;
 
-        for(const auto &fixture : patch_.fixtures) {
+        for(std::size_t fixture_index{0}; fixture_index < patch_.fixtures.size(); fixture_index++) {
+            const fixture_instance &fixture{patch_.fixtures[fixture_index]};
             if(fixture.id.empty()) {
                 return mapper_result::failure("fixture id is empty");
             }
@@ -67,6 +71,7 @@ public:
                 return mapper_result::failure("duplicate fixture id: " + fixture.id);
             }
             fixture_ids.insert(fixture.id);
+            fixture_indices[fixture.id] = fixture_index;
 
             const fixture_profile *profile{find_profile(fixture.profile)};
             if(!profile) {
@@ -100,12 +105,14 @@ public:
             }
         }
 
+        fixture_indices_ = std::move(fixture_indices);
         reset_universes();
         validated_ = true;
         return mapper_result::success();
     }
 
     mapper_result reset_universes() {
+        rebuild_fixture_indices_unchecked();
         universes_.clear();
         for(const auto &fixture : patch_.fixtures) {
             const fixture_profile *profile{find_profile(fixture.profile)};
@@ -365,12 +372,21 @@ private:
     };
 
     const fixture_instance *find_fixture(const std::string &fixture_id) const {
-        for(const auto &fixture : patch_.fixtures) {
-            if(fixture.id == fixture_id) {
-                return &fixture;
-            }
+        const auto found = fixture_indices_.find(fixture_id);
+        if(found == fixture_indices_.end()) {
+            return nullptr;
         }
-        return nullptr;
+        if(patch_.fixtures.size() <= found->second) {
+            return nullptr;
+        }
+        return &patch_.fixtures[found->second];
+    }
+
+    void rebuild_fixture_indices_unchecked() {
+        fixture_indices_.clear();
+        for(std::size_t fixture_index{0}; fixture_index < patch_.fixtures.size(); fixture_index++) {
+            fixture_indices_[patch_.fixtures[fixture_index].id] = fixture_index;
+        }
     }
 
     resolved_parameter resolve_parameter(const std::string &fixture_id, const std::string &parameter_key) const {
@@ -451,6 +467,7 @@ private:
 
     std::map<std::string, fixture_profile> profiles_{};
     fixture_patch patch_{};
+    std::map<std::string, std::size_t> fixture_indices_{};
     std::map<int, dmx_universe> universes_{};
     bool validated_{false};
 };
