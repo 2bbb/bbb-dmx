@@ -276,6 +276,7 @@ Attributes implemented today:
 
 | Attribute | Type | Default | Description |
 |---|---|---:|---|
+| `@setup` | symbol/string | empty | Optional `bbb.dmx.setup.v1` path. Loaded on initialization and by `readsetup`; explicit object attributes override setup values. |
 | `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
 | `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
 | `@autobang` | bool | `1` | If non-zero, successful updates immediately output according to `@universe_mode`. |
@@ -297,6 +298,7 @@ Outlets:
 #### Load / inspect
 
 ```max
+readsetup setups/show.json
 read patches/show.json
 reload
 dump

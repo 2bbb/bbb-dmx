@@ -108,13 +108,17 @@ Reports fixture metadata from loaded patch/profile JSON.
 
 Samples `char` or `float32` `jit.matrix` color data into fixture parameters through the common fixture patch/profile layer.
 
-- Input: `jit_matrix`, `readpatch`, `readmap`, `reload`, `bang`, `dump`
+- Input: `jit_matrix`, `readsetup`, `readpatch`, `readmap`, `reload`, `bang`, `dump`
 - Output: `universe <id> <512 byte values>`
-- Attributes: `@patch`, `@map`, `@universe`, `@universe_mode`, `@plane_order`, `@gamma`, `@brightness`, `@autobang`, `@invert_x`, `@invert_y`
+- Attributes: `@setup`, `@patch`, `@map`, `@universe`, `@universe_mode`, `@plane_order`, `@gamma`, `@brightness`, `@autobang`, `@invert_x`, `@invert_y`
 - Matrix values are normalized first, then expanded through the fixture parameter depth (`u8`, `u16`, or `u24`).
 - Map files live in `maps/`; see `docs/SPEC.matrixmap.md`.
 
 `changed` mode outputs full universe frames for universes whose data changed. It is not a per-channel delta protocol.
+
+### Shared setup files
+
+`bbb.dmx.fixturemap` and `bbb.dmx.matrixmap` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap` or `matrixmap`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@config` is not reused here because it already means object-specific rule/config files for `curve`, `mask`, and `assert`.
 
 ### `bbb.dmx.palette`
 

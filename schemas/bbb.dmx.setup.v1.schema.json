@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.setup.v1.schema.json",
+  "title": "bbb.dmx setup v1",
+  "description": "Shared setup file for bbb.dmx objects. Object attributes override values loaded from this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.setup.v1"
+    },
+    "patch": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "map": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "groups": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "group": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "semantic_overrides": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "universe": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "universe_mode": {
+      "enum": [
+        "all",
+        "selected",
+        "changed"
+      ]
+    },
+    "autobang": {
+      "$ref": "#/$defs/boolish"
+    },
+    "tracking_mode": {
+      "enum": [
+        "smart",
+        "pan",
+        "off"
+      ]
+    },
+    "default_pan_range": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "default_tilt_range": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "track_strict": {
+      "$ref": "#/$defs/boolish"
+    },
+    "color_use_white": {
+      "$ref": "#/$defs/boolish"
+    },
+    "color_wheel_fallback": {
+      "$ref": "#/$defs/boolish"
+    },
+    "plane_order": {
+      "enum": [
+        "rgba",
+        "argb",
+        "bgra",
+        "gray"
+      ]
+    },
+    "gamma": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "brightness": {
+      "type": "number",
+      "minimum": 0
+    },
+    "invert_x": {
+      "$ref": "#/$defs/boolish"
+    },
+    "invert_y": {
+      "$ref": "#/$defs/boolish"
+    },
+    "fixturemap": {
+      "$ref": "#/$defs/setup_values"
+    },
+    "matrixmap": {
+      "$ref": "#/$defs/setup_values"
+    }
+  },
+  "$defs": {
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "boolish": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
+      ]
+    },
+    "setup_values": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "patch": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "map": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "groups": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "group": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "semantic_overrides": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "universe": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "universe_mode": {
+          "enum": [
+            "all",
+            "selected",
+            "changed"
+          ]
+        },
+        "autobang": {
+          "$ref": "#/$defs/boolish"
+        },
+        "tracking_mode": {
+          "enum": [
+            "smart",
+            "pan",
+            "off"
+          ]
+        },
+        "default_pan_range": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "default_tilt_range": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "track_strict": {
+          "$ref": "#/$defs/boolish"
+        },
+        "color_use_white": {
+          "$ref": "#/$defs/boolish"
+        },
+        "color_wheel_fallback": {
+          "$ref": "#/$defs/boolish"
+        },
+        "plane_order": {
+          "enum": [
+            "rgba",
+            "argb",
+            "bgra",
+            "gray"
+          ]
+        },
+        "gamma": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": 0
+        },
+        "invert_x": {
+          "$ref": "#/$defs/boolish"
+        },
+        "invert_y": {
+          "$ref": "#/$defs/boolish"
+        }
+      }
+    }
+  }
+}

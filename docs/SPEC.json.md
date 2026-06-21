@@ -34,6 +34,7 @@ Current schema ids:
 | Curve rules | `bbb.dmx.curve.v1` | `schemas/bbb.dmx.curve.v1.schema.json` |
 | Mask rules | `bbb.dmx.mask.v1` | `schemas/bbb.dmx.mask.v1.schema.json` |
 | Assertion rules | `bbb.dmx.assert.v1` | `schemas/bbb.dmx.assert.v1.schema.json` |
+| Shared setup | `bbb.dmx.setup.v1` | `schemas/bbb.dmx.setup.v1.schema.json` |
 
 Rules for future versions:
 
@@ -625,3 +626,29 @@ node tools/bbb-dmx-convert/dist/lint.js patches/show.json scenes/show.json --fix
 ```
 
 The linter performs JSON Schema validation and semantic checks that schemas cannot express cleanly: patch profile resolution, fixture id uniqueness, unknown profile/mode references, footprint overflow past channel 512, overlapping fixture footprints in the same universe, duplicate channel offsets/keys, and parameter references to missing channels. Treat linter failures as data bugs; do not rely on Max objects to discover these at show time.
+
+## 11. Shared setup: `bbb.dmx.setup.v1`
+
+A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap` and `bbb.dmx.matrixmap` through `@setup` or `readsetup`. `@config` is intentionally not reused because other bbb.dmx objects already use it for object-specific rule files.
+
+Top-level fields are common defaults. The `fixturemap` and `matrixmap` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
+
+```json
+{
+  "schema": "bbb.dmx.setup.v1",
+  "patch": "../patches/rgb-grid.example.json",
+  "universe_mode": "all",
+  "color_wheel_fallback": true,
+  "fixturemap": {
+    "universe": 1,
+    "tracking_mode": "smart"
+  },
+  "matrixmap": {
+    "map": "../maps/rgb-grid.example.json",
+    "plane_order": "rgba",
+    "gamma": 1.0
+  }
+}
+```
+
+Supported path fields: `patch`, `map`, `groups`/`group`, and `semantic_overrides`. Supported scalar fields mirror existing object attributes: `universe`, `universe_mode`, `autobang`, fixture tracking fields, color semantic fields, matrix plane/gamma/brightness/invert fields. Unknown fields are rejected.

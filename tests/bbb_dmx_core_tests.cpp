@@ -15,6 +15,7 @@
 #include "bbb/dmx/movertrack.hpp"
 #include "bbb/dmx/pattern.hpp"
 #include "bbb/dmx/semantic_merge.hpp"
+#include "bbb/dmx/setup.hpp"
 
 namespace {
 
@@ -657,6 +658,47 @@ int main() {
         generated_fixture.id = fixture_id_buffer;
         group_patch.fixtures.push_back(generated_fixture);
     }
+    bbb::dmx::dmx_setup_document setup_document{};
+    map_result = bbb::dmx::parse_dmx_setup_text(R"json({
+        "schema": "bbb.dmx.setup.v1",
+        "patch": "patch-from-mvr.json",
+        "groups": "groups/show.groups.json",
+        "semantic_overrides": "semantic_overrides.json",
+        "universe": 3,
+        "universe_mode": "all",
+        "color_wheel_fallback": true,
+        "fixturemap": {
+            "universe": 4,
+            "tracking_mode": "off",
+            "default_pan_range": 360.0
+        },
+        "matrixmap": {
+            "map": "pixelmap.json",
+            "plane_order": "bgra",
+            "gamma": 2.2,
+            "invert_x": true
+        }
+    })json", setup_document);
+    require(map_result.ok, "setup JSON parses");
+    const bbb::dmx::dmx_setup_values fixturemap_setup{bbb::dmx::merge_setup_values(setup_document.common, setup_document.fixturemap)};
+    require(fixturemap_setup.patch.has_value() && fixturemap_setup.patch.value() == "patch-from-mvr.json", "setup common patch applies to fixturemap");
+    require(fixturemap_setup.groups.has_value() && fixturemap_setup.groups.value() == "groups/show.groups.json", "setup common groups applies to fixturemap");
+    require(fixturemap_setup.universe.has_value() && fixturemap_setup.universe.value() == 4, "setup fixturemap section overrides common universe");
+    require(fixturemap_setup.universe_mode.has_value() && fixturemap_setup.universe_mode.value() == "all", "setup fixturemap inherits universe mode");
+    require(fixturemap_setup.tracking_mode.has_value() && fixturemap_setup.tracking_mode.value() == "off", "setup fixturemap tracking mode parses");
+    require(fixturemap_setup.default_pan_range.has_value() && nearly_equal(fixturemap_setup.default_pan_range.value(), 360.0), "setup fixturemap default pan range parses");
+    const bbb::dmx::dmx_setup_values matrixmap_setup{bbb::dmx::merge_setup_values(setup_document.common, setup_document.matrixmap)};
+    require(matrixmap_setup.map.has_value() && matrixmap_setup.map.value() == "pixelmap.json", "setup matrixmap map parses");
+    require(matrixmap_setup.universe.has_value() && matrixmap_setup.universe.value() == 3, "setup matrixmap inherits common universe");
+    require(matrixmap_setup.plane_order.has_value() && matrixmap_setup.plane_order.value() == "bgra", "setup matrixmap plane order parses");
+    require(matrixmap_setup.gamma.has_value() && nearly_equal(matrixmap_setup.gamma.value(), 2.2), "setup matrixmap gamma parses");
+    require(matrixmap_setup.invert_x.has_value() && matrixmap_setup.invert_x.value(), "setup matrixmap invert_x parses");
+    map_result = bbb::dmx::parse_dmx_setup_text(R"json({
+        "schema": "bbb.dmx.setup.v1",
+        "fixturemap": { "patchh": "typo.json" }
+    })json", setup_document);
+    require(!map_result.ok, "setup JSON rejects unknown keys");
+
     bbb::dmx::fixture_group_set group_set{};
     map_result = bbb::dmx::parse_fixture_groups_text(R"json({
         "schema": "bbb.dmx.groups.v1",
