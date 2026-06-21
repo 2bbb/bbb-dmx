@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.semantic_overrides.v1.schema.json",
+  "title": "bbb.dmx semantic overrides v1",
+  "description": "Profile/mode semantic aliases and role mappings used by fixturemap and matrixmap.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "profiles"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.semantic_overrides.v1"
+    },
+    "profiles": {
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/profile_override"
+      }
+    }
+  },
+  "$defs": {
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "modes"
+      ],
+      "properties": {
+        "modes": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/mode_override"
+          }
+        }
+      }
+    },
+    "mode_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/non_empty_string"
+          }
+        },
+        "intensity": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/non_empty_string"
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parameters"
+              ],
+              "properties": {
+                "parameters": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/non_empty_string"
+                  }
+                },
+                "primary": {
+                  "$ref": "#/$defs/non_empty_string"
+                }
+              }
+            }
+          ]
+        },
+        "color": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rgb": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/rgb_block"
+              }
+            },
+            "cmy": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/cmy_block"
+              }
+            }
+          }
+        },
+        "rgb": {
+          "description": "Legacy top-level RGB blocks accepted by the runtime parser; new files should prefer color.rgb.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rgb_block"
+          }
+        },
+        "cmy": {
+          "description": "Legacy top-level CMY blocks accepted by the runtime parser; new files should prefer color.cmy.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cmy_block"
+          }
+        }
+      }
+    },
+    "rgb_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "red",
+        "green",
+        "blue"
+      ],
+      "properties": {
+        "red": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "green": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "blue": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "white": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "dimmer": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "cmy_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cyan",
+        "magenta",
+        "yellow"
+      ],
+      "properties": {
+        "cyan": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "magenta": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "yellow": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "dimmer": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    }
+  }
+}

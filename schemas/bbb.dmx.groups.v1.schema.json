@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.groups.v1.schema.json",
+  "title": "bbb.dmx fixture groups v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "groups"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bbb.dmx.groups.v1"
+    },
+    "groups": {
+      "description": "Map of group id to patch fixture ids, nested group references, and fixture_pattern ranges. Wildcards are intentionally unsupported in v1.",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "group"
+              ],
+              "properties": {
+                "group": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fixture_pattern",
+                "start_index",
+                "num"
+              ],
+              "properties": {
+                "fixture_pattern": {
+                  "description": "printf-style fixture id pattern with exactly one integer conversion such as D_%02d.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "start_index": {
+                  "type": "integer"
+                },
+                "num": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
