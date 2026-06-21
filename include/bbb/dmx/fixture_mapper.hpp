@@ -38,7 +38,7 @@ public:
         profiles_.clear();
         patch_ = fixture_patch{};
         fixture_indices_.clear();
-        normalized_write_targets_.clear();
+        parameter_targets_.clear();
         universes_.clear();
         validated_ = false;
     }
@@ -48,7 +48,7 @@ public:
             return mapper_result::failure("profile key is empty");
         }
         profiles_[profile.key] = profile;
-        normalized_write_targets_.clear();
+        parameter_targets_.clear();
         validated_ = false;
         return mapper_result::success();
     }
@@ -56,7 +56,7 @@ public:
     mapper_result set_patch(const fixture_patch &patch) {
         patch_ = patch;
         fixture_indices_.clear();
-        normalized_write_targets_.clear();
+        parameter_targets_.clear();
         validated_ = false;
         return validate_and_reset();
     }
@@ -117,6 +117,7 @@ public:
 
     mapper_result reset_universes() {
         rebuild_fixture_indices_unchecked();
+        parameter_targets_.clear();
         universes_.clear();
         for(const auto &fixture : patch_.fixtures) {
             const fixture_profile *profile{find_profile(fixture.profile)};
@@ -146,73 +147,67 @@ public:
     }
 
     mapper_result set_u8(const std::string &fixture_id, const std::string &parameter_key, int value) {
-        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
-        if(!resolved.ok) {
-            return mapper_result::failure(resolved.message);
-        }
-        if(resolved.parameter->type != fixture_parameter_type::u8 && resolved.parameter->type != fixture_parameter_type::enum_u8) {
-            return mapper_result::failure("parameter is not u8: " + parameter_key);
-        }
-        if(resolved.parameter->channels.empty()) {
-            return mapper_result::failure("parameter has no channel: " + parameter_key);
-        }
-        const fixture_channel *channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
-        if(!channel) {
-            return mapper_result::failure("parameter channel missing: " + parameter_key);
-        }
-        return write_u8(*resolved.fixture, *channel, value);
-    }
-
-    mapper_result set_u16(const std::string &fixture_id, const std::string &parameter_key, std::uint16_t value) {
-        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
-        if(!resolved.ok) {
-            return mapper_result::failure(resolved.message);
-        }
-        if(resolved.parameter->type != fixture_parameter_type::u16) {
-            return mapper_result::failure("parameter is not u16: " + parameter_key);
-        }
-        if(resolved.parameter->channels.size() < 2) {
-            return mapper_result::failure("u16 parameter needs two channels: " + parameter_key);
-        }
-        const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
-        if(!first_channel) {
-            return mapper_result::failure("parameter first channel missing: " + parameter_key);
-        }
-        return write_u16(*resolved.fixture, *first_channel, value, resolved.parameter->order);
-    }
-
-    mapper_result set_u24(const std::string &fixture_id, const std::string &parameter_key, std::uint32_t value) {
-        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
-        if(!resolved.ok) {
-            return mapper_result::failure(resolved.message);
-        }
-        if(resolved.parameter->type != fixture_parameter_type::u24) {
-            return mapper_result::failure("parameter is not u24: " + parameter_key);
-        }
-        if(resolved.parameter->channels.size() < 3) {
-            return mapper_result::failure("u24 parameter needs three channels: " + parameter_key);
-        }
-        const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
-        if(!first_channel) {
-            return mapper_result::failure("parameter first channel missing: " + parameter_key);
-        }
-        return write_u24(*resolved.fixture, *first_channel, value, resolved.parameter->order);
-    }
-
-    mapper_result set_normalized(const std::string &fixture_id, const std::string &parameter_key, double value) {
-        normalized_write_target target{};
-        const mapper_result resolved{resolve_normalized_write_target(fixture_id, parameter_key, target)};
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
         if(!resolved.ok) {
             return resolved;
         }
-        dmx_universe &universe = universes_[target.universe];
+        if(target->type != fixture_parameter_type::u8 && target->type != fixture_parameter_type::enum_u8) {
+            return mapper_result::failure("parameter is not u8: " + parameter_key);
+        }
+        const write_result result{universes_[target->universe].set_channel(target->first_address, value)};
+        if(!result.ok) {
+            return mapper_result::failure(result.message);
+        }
+        return mapper_result::success();
+    }
+
+    mapper_result set_u16(const std::string &fixture_id, const std::string &parameter_key, std::uint16_t value) {
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
+        if(!resolved.ok) {
+            return resolved;
+        }
+        if(target->type != fixture_parameter_type::u16) {
+            return mapper_result::failure("parameter is not u16: " + parameter_key);
+        }
+        const write_result result{universes_[target->universe].set_u16(target->first_address, value, target->order)};
+        if(!result.ok) {
+            return mapper_result::failure(result.message);
+        }
+        return mapper_result::success();
+    }
+
+    mapper_result set_u24(const std::string &fixture_id, const std::string &parameter_key, std::uint32_t value) {
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
+        if(!resolved.ok) {
+            return resolved;
+        }
+        if(target->type != fixture_parameter_type::u24) {
+            return mapper_result::failure("parameter is not u24: " + parameter_key);
+        }
+        const write_result result{universes_[target->universe].set_u24(target->first_address, value, target->order)};
+        if(!result.ok) {
+            return mapper_result::failure(result.message);
+        }
+        return mapper_result::success();
+    }
+
+    mapper_result set_normalized(const std::string &fixture_id, const std::string &parameter_key, double value) {
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
+        if(!resolved.ok) {
+            return resolved;
+        }
+        dmx_universe &target_universe = universes_[target->universe];
         write_result result{};
-        if(target.type == fixture_parameter_type::u16) {
-            result = universe.set_u16(target.first_address, normalized_to_u16(value), target.order);
-        } else if(target.type == fixture_parameter_type::u24) {
-            result = universe.set_u24(target.first_address, normalized_to_u24(value), target.order);
+        if(target->type == fixture_parameter_type::u16) {
+            result = target_universe.set_u16(target->first_address, normalized_to_u16(value), target->order);
+        } else if(target->type == fixture_parameter_type::u24) {
+            result = target_universe.set_u24(target->first_address, normalized_to_u24(value), target->order);
         } else {
-            result = universe.set_channel(target.first_address, (int)normalized_to_u8(value));
+            result = target_universe.set_channel(target->first_address, (int)normalized_to_u8(value));
         }
         if(!result.ok) {
             return mapper_result::failure(result.message);
@@ -221,55 +216,36 @@ public:
     }
 
     mapper_result current_raw_value(const std::string &fixture_id, const std::string &parameter_key, int &value) const {
-        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
         if(!resolved.ok) {
-            return mapper_result::failure(resolved.message);
+            return resolved;
         }
-        if(resolved.parameter->channels.empty()) {
-            return mapper_result::failure("parameter has no channel: " + parameter_key);
-        }
-        const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
-        if(!first_channel) {
-            return mapper_result::failure("parameter first channel missing: " + parameter_key);
-        }
-        const dmx_universe &target_universe{universe(resolved.fixture->universe)};
-        const int first_address{resolved.fixture->address + first_channel->offset - 1};
-        if(resolved.parameter->type == fixture_parameter_type::u16) {
-            if(resolved.parameter->channels.size() < 2) {
+        const dmx_universe &target_universe{universe(target->universe)};
+        if(target->type == fixture_parameter_type::u16) {
+            if(target->addresses.size() < 2) {
                 return mapper_result::failure("u16 parameter needs two channels: " + parameter_key);
             }
-            const fixture_channel *second_channel{resolved.mode->find_channel(resolved.parameter->channels[1])};
-            if(!second_channel) {
-                return mapper_result::failure("parameter second channel missing: " + parameter_key);
-            }
-            const int second_address{resolved.fixture->address + second_channel->offset - 1};
             value = (int)combine_16(
-                (std::uint8_t)target_universe.channel(first_address),
-                (std::uint8_t)target_universe.channel(second_address),
-                resolved.parameter->order
+                (std::uint8_t)target_universe.channel(target->addresses[0].second),
+                (std::uint8_t)target_universe.channel(target->addresses[1].second),
+                target->order
             );
             return mapper_result::success();
         }
-        if(resolved.parameter->type == fixture_parameter_type::u24) {
-            if(resolved.parameter->channels.size() < 3) {
+        if(target->type == fixture_parameter_type::u24) {
+            if(target->addresses.size() < 3) {
                 return mapper_result::failure("u24 parameter needs three channels: " + parameter_key);
             }
-            const fixture_channel *second_channel{resolved.mode->find_channel(resolved.parameter->channels[1])};
-            const fixture_channel *third_channel{resolved.mode->find_channel(resolved.parameter->channels[2])};
-            if(!second_channel || !third_channel) {
-                return mapper_result::failure("parameter u24 channel missing: " + parameter_key);
-            }
-            const int second_address{resolved.fixture->address + second_channel->offset - 1};
-            const int third_address{resolved.fixture->address + third_channel->offset - 1};
             value = (int)combine_24(
-                (std::uint8_t)target_universe.channel(first_address),
-                (std::uint8_t)target_universe.channel(second_address),
-                (std::uint8_t)target_universe.channel(third_address),
-                resolved.parameter->order
+                (std::uint8_t)target_universe.channel(target->addresses[0].second),
+                (std::uint8_t)target_universe.channel(target->addresses[1].second),
+                (std::uint8_t)target_universe.channel(target->addresses[2].second),
+                target->order
             );
             return mapper_result::success();
         }
-        value = target_universe.channel(first_address);
+        value = target_universe.channel(target->first_address);
         return mapper_result::success();
     }
 
@@ -279,45 +255,32 @@ public:
         std::vector<std::pair<int, int>> &addresses
     ) const
     {
-        addresses.clear();
-        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
+        const parameter_target *target{nullptr};
+        const mapper_result resolved{resolve_parameter_target(fixture_id, parameter_key, target)};
         if(!resolved.ok) {
-            return mapper_result::failure(resolved.message);
+            addresses.clear();
+            return resolved;
         }
-        std::size_t required_channel_count{1};
-        if(resolved.parameter->type == fixture_parameter_type::u16) {
-            required_channel_count = 2;
-        } else if(resolved.parameter->type == fixture_parameter_type::u24) {
-            required_channel_count = 3;
-        }
-        if(resolved.parameter->channels.size() < required_channel_count) {
-            return mapper_result::failure("parameter has too few channels: " + parameter_key);
-        }
-        addresses.reserve(required_channel_count);
-        for(std::size_t index{0}; index < required_channel_count; index++) {
-            const fixture_channel *channel{resolved.mode->find_channel(resolved.parameter->channels[index])};
-            if(!channel) {
-                return mapper_result::failure("parameter channel missing: " + parameter_key);
-            }
-            addresses.push_back({resolved.fixture->universe, resolved.fixture->address + channel->offset - 1});
-        }
+        addresses = target->addresses;
         return mapper_result::success();
     }
 
     mapper_result set_pan_tilt_bytes(const std::string &fixture_id, int pan_1, int pan_2, int tilt_1, int tilt_2) {
-        const resolved_parameter pan{resolve_parameter(fixture_id, "pan")};
-        if(!pan.ok) {
-            return mapper_result::failure(pan.message);
-        }
-        const resolved_parameter tilt{resolve_parameter(fixture_id, "tilt")};
-        if(!tilt.ok) {
-            return mapper_result::failure(tilt.message);
-        }
-        mapper_result result{set_u8_bytes(*pan.fixture, *pan.mode, *pan.parameter, pan_1, pan_2)};
+        const parameter_target *pan{nullptr};
+        mapper_result result{resolve_parameter_target(fixture_id, "pan", pan)};
         if(!result.ok) {
             return result;
         }
-        return set_u8_bytes(*tilt.fixture, *tilt.mode, *tilt.parameter, tilt_1, tilt_2);
+        const parameter_target *tilt{nullptr};
+        result = resolve_parameter_target(fixture_id, "tilt", tilt);
+        if(!result.ok) {
+            return result;
+        }
+        result = set_u16_bytes(*pan, pan_1, pan_2, "pan");
+        if(!result.ok) {
+            return result;
+        }
+        return set_u16_bytes(*tilt, tilt_1, tilt_2, "tilt");
     }
 
     mapper_result set_channel(int universe_id, int address, int value) {
@@ -381,12 +344,13 @@ private:
         const fixture_parameter *parameter{nullptr};
     };
 
-    struct normalized_write_target {
+    struct parameter_target {
     public:
         fixture_parameter_type type{fixture_parameter_type::u8};
         byte_order order{byte_order::coarse_fine};
         int universe{0};
         int first_address{0};
+        std::vector<std::pair<int, int>> addresses{};
     };
 
     const fixture_instance *find_fixture(const std::string &fixture_id) const {
@@ -427,12 +391,13 @@ private:
         return resolved_parameter{true, "", fixture, profile, mode, parameter};
     }
 
-    mapper_result resolve_normalized_write_target(const std::string &fixture_id, const std::string &parameter_key, normalized_write_target &target) {
-        const auto cached_fixture = normalized_write_targets_.find(fixture_id);
-        if(cached_fixture != normalized_write_targets_.end()) {
+    mapper_result resolve_parameter_target(const std::string &fixture_id, const std::string &parameter_key, const parameter_target *&target) const {
+        target = nullptr;
+        const auto cached_fixture = parameter_targets_.find(fixture_id);
+        if(cached_fixture != parameter_targets_.end()) {
             const auto cached_target = cached_fixture->second.find(parameter_key);
             if(cached_target != cached_fixture->second.end()) {
-                target = cached_target->second;
+                target = &cached_target->second;
                 return mapper_result::success();
             }
         }
@@ -469,11 +434,22 @@ private:
             return mapper_result::failure("parameter first channel missing: " + parameter_key);
         }
 
-        target.type = resolved.parameter->type;
-        target.order = resolved.parameter->order;
-        target.universe = resolved.fixture->universe;
-        target.first_address = resolved.fixture->address + first_channel->offset - 1;
-        normalized_write_targets_[fixture_id][parameter_key] = target;
+        parameter_target resolved_target{};
+        resolved_target.type = resolved.parameter->type;
+        resolved_target.order = resolved.parameter->order;
+        resolved_target.universe = resolved.fixture->universe;
+        resolved_target.first_address = resolved.fixture->address + first_channel->offset - 1;
+        resolved_target.addresses.reserve(required_channel_count);
+        for(std::size_t index{0}; index < required_channel_count; index++) {
+            const fixture_channel *channel{resolved.mode->find_channel(resolved.parameter->channels[index])};
+            if(!channel) {
+                return mapper_result::failure("parameter channel missing: " + parameter_key);
+            }
+            resolved_target.addresses.push_back({resolved.fixture->universe, resolved.fixture->address + channel->offset - 1});
+        }
+        parameter_target &cached_target = parameter_targets_[fixture_id][parameter_key];
+        cached_target = resolved_target;
+        target = &cached_target;
         return mapper_result::success();
     }
 
@@ -507,20 +483,24 @@ private:
         return mapper_result::success();
     }
 
-    mapper_result set_u8_bytes(const fixture_instance &fixture, const fixture_mode &mode, const fixture_parameter &parameter, int first_value, int second_value) {
-        if(parameter.channels.size() < 2) {
-            return mapper_result::failure("u16 byte parameter needs two channels: " + parameter.key);
+    mapper_result set_u16_bytes(const parameter_target &target, int first_value, int second_value, const std::string &parameter_key) {
+        if(target.type != fixture_parameter_type::u16) {
+            return mapper_result::failure("parameter is not u16: " + parameter_key);
         }
-        const fixture_channel *first_channel{mode.find_channel(parameter.channels[0])};
-        const fixture_channel *second_channel{mode.find_channel(parameter.channels[1])};
-        if(!first_channel || !second_channel) {
-            return mapper_result::failure("u16 byte parameter channel missing: " + parameter.key);
+        if(target.addresses.size() < 2) {
+            return mapper_result::failure("u16 byte parameter needs two channels: " + parameter_key);
         }
-        mapper_result result{write_u8(fixture, *first_channel, first_value)};
+        dmx_universe &target_universe = universes_[target.universe];
+        const int first_address{target.addresses[0].second};
+        const int second_address{target.addresses[1].second};
+        write_result result{target_universe.set_channel(first_address, first_value)};
+        if(result.ok) {
+            result = target_universe.set_channel(second_address, second_value);
+        }
         if(!result.ok) {
-            return result;
+            return mapper_result::failure(result.message);
         }
-        return write_u8(fixture, *second_channel, second_value);
+        return mapper_result::success();
     }
 
     mapper_result write_parameter_default(const fixture_instance &fixture, const fixture_mode &mode, const fixture_parameter &parameter) {
@@ -536,7 +516,7 @@ private:
     std::map<std::string, fixture_profile> profiles_{};
     fixture_patch patch_{};
     std::map<std::string, std::size_t> fixture_indices_{};
-    std::unordered_map<std::string, std::unordered_map<std::string, normalized_write_target>> normalized_write_targets_{};
+    mutable std::unordered_map<std::string, std::unordered_map<std::string, parameter_target>> parameter_targets_{};
     std::map<int, dmx_universe> universes_{};
     bool validated_{false};
 };
