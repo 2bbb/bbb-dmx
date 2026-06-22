@@ -12,6 +12,9 @@
     "schema": {
       "const": "bbb.dmx.setup.v1"
     },
+    "config": {
+      "$ref": "#/$defs/non_empty_string"
+    },
     "patch": {
       "$ref": "#/$defs/non_empty_string"
     },
@@ -92,6 +95,9 @@
     },
     "matrixmap": {
       "$ref": "#/$defs/setup_values"
+    },
+    "mask": {
+      "$ref": "#/$defs/setup_values"
     }
   },
   "$defs": {
@@ -115,6 +121,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "config": {
+          "$ref": "#/$defs/non_empty_string"
+        },
         "patch": {
           "$ref": "#/$defs/non_empty_string"
         },

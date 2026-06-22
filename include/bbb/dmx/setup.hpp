@@ -12,6 +12,7 @@ namespace bbb::dmx {
 
 struct dmx_setup_values {
 public:
+    std::optional<std::string> config{};
     std::optional<std::string> patch{};
     std::optional<std::string> map{};
     std::optional<std::string> groups{};
@@ -38,6 +39,7 @@ public:
     dmx_setup_values common{};
     dmx_setup_values fixturemap{};
     dmx_setup_values matrixmap{};
+    dmx_setup_values mask{};
 };
 
 inline bool setup_json_string_optional(const json_value &object, const std::string &key, std::optional<std::string> &value, std::string &error) {
@@ -110,6 +112,7 @@ inline mapper_result dmx_setup_values_from_json(const json_value &object, const 
     }
 
     const std::set<std::string> allowed_keys{
+        "config",
         "patch",
         "map",
         "groups",
@@ -137,6 +140,9 @@ inline mapper_result dmx_setup_values_from_json(const json_value &object, const 
     }
 
     std::string error{};
+    if(!setup_json_string_optional(object, "config", values.config, error)) {
+        return mapper_result::failure(error + ": " + context);
+    }
     if(!setup_json_string_optional(object, "patch", values.patch, error)) {
         return mapper_result::failure(error + ": " + context);
     }
@@ -210,6 +216,7 @@ inline void merge_setup_optional(std::optional<value_type> &target, const std::o
 
 inline dmx_setup_values merge_setup_values(const dmx_setup_values &common, const dmx_setup_values &section) {
     dmx_setup_values merged{common};
+    merge_setup_optional(merged.config, section.config);
     merge_setup_optional(merged.patch, section.patch);
     merge_setup_optional(merged.map, section.map);
     merge_setup_optional(merged.groups, section.groups);
@@ -238,6 +245,7 @@ inline mapper_result dmx_setup_from_json(const json_value &root, dmx_setup_docum
 
     const std::set<std::string> top_level_keys{
         "schema",
+        "config",
         "patch",
         "map",
         "groups",
@@ -259,6 +267,7 @@ inline mapper_result dmx_setup_from_json(const json_value &root, dmx_setup_docum
         "invert_y",
         "fixturemap",
         "matrixmap",
+        "mask",
     };
     for(const auto &entry : root.object_value) {
         if(top_level_keys.find(entry.first) == top_level_keys.end()) {
@@ -279,6 +288,7 @@ inline mapper_result dmx_setup_from_json(const json_value &root, dmx_setup_docum
     common_object.object_value.erase("schema");
     common_object.object_value.erase("fixturemap");
     common_object.object_value.erase("matrixmap");
+    common_object.object_value.erase("mask");
     mapper_result result{dmx_setup_values_from_json(common_object, "top-level", loaded.common)};
     if(!result.ok) {
         return result;
@@ -293,6 +303,13 @@ inline mapper_result dmx_setup_from_json(const json_value &root, dmx_setup_docum
     const json_value *matrixmap_section{root.find("matrixmap")};
     if(matrixmap_section) {
         result = dmx_setup_values_from_json(*matrixmap_section, "matrixmap", loaded.matrixmap);
+        if(!result.ok) {
+            return result;
+        }
+    }
+    const json_value *mask_section{root.find("mask")};
+    if(mask_section) {
+        result = dmx_setup_values_from_json(*mask_section, "mask", loaded.mask);
         if(!result.ok) {
             return result;
         }
